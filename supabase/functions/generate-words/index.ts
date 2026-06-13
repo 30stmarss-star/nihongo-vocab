@@ -61,6 +61,7 @@ function prompt(level: string, count: number, exclude: string[]): string {
 
 규칙:
 - 정확성이 최우선. 독음(히라가나), 동사 군 분류, 한자 훈독, 예문이 모두 정확해야 합니다.
+- meaning(뜻)과 예문의 ko는 **반드시 한국어(한글)로만** 작성. 영어 단어(예: "choose", "large")를 절대 쓰지 마세요.
 - 동사는 1군(5단)/2군(1단)/3군(불규칙=する·来る류)으로 분류해 verbGroup에 넣고, 동사가 아니면 verbGroup은 null.
 - hanja: 각 구성 한자의 한국식 훈독을 "훈 음" 형태로 ("食"→"먹을 식"). 가나 전용 단어는 빈 배열.
 - examples: 단어마다 2개. ${level}에서 이해 가능한 쉬운 어휘로만, jp(한자 포함)·kana(히라가나)·ko(한국어)를 모두 채움.
@@ -143,6 +144,18 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const summary: Record<string, number> = {};
+
+    // 기존 불량 단어 정리 (영어 뜻·깨진 데이터 삭제 — 규칙 기반)
+    {
+      const { data: all } = await supabase
+        .from("words")
+        .select("id,kanji,kana,meaning,pos,examples");
+      const badIds = (all ?? []).filter((w: any) => !isValid(w)).map((w: any) => w.id);
+      if (badIds.length) {
+        await supabase.from("words").delete().in("id", badIds);
+        summary.cleaned = badIds.length;
+      }
+    }
 
     // 처리할 (레벨, 개수) 목록
     let jobs: { level: string; count: number }[];

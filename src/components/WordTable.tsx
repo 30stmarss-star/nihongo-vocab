@@ -71,7 +71,7 @@ function WordRow({
       {/* 단어: 꾹 누르면 상세 카드 */}
       <button
         type="button"
-        className="no-select w-[34%] shrink-0 cursor-pointer text-left text-lg text-white"
+        className="no-select w-[34%] shrink-0 cursor-pointer truncate text-left text-base text-white sm:text-lg"
         style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
         onPointerDown={(e) => onShowCard(word, e.clientX, e.clientY)}
@@ -92,7 +92,7 @@ function WordRow({
         onPointerLeave={() => setRevealed(false)}
         onPointerCancel={() => setRevealed(false)}
       >
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-4">
           <MaskedCell text={word.kana} revealed={revealed} className="text-neutral-200" />
           <MaskedCell text={word.meaning} revealed={revealed} className="text-neutral-300" />
         </div>
@@ -137,10 +137,10 @@ function MaskedCell({
   className?: string;
 }) {
   return (
-    <span className="relative inline-flex items-center">
+    <span className="relative block">
       <span
         className={[
-          "transition-opacity duration-200",
+          "block truncate text-sm transition-opacity duration-200 sm:text-base",
           revealed ? "opacity-100" : "opacity-0",
           className,
         ].join(" ")}
@@ -150,7 +150,7 @@ function MaskedCell({
       <span
         aria-hidden
         className={[
-          "absolute inset-y-1 -left-1 -right-1 rounded-[2px]",
+          "absolute inset-y-1 left-0 right-0 rounded-[2px]",
           "bg-white/15",
           "transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",
