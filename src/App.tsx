@@ -21,6 +21,7 @@ import { WordCard } from "./components/WordCard";
 import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
 import { SetPassword } from "./components/SetPassword";
+import { SyncDebug } from "./components/SyncDebug";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
@@ -328,6 +329,8 @@ export default function App() {
           <WordCard word={card.word} x={card.x} y={card.y} />
         </>
       )}
+
+      {CLOUD && userId && <SyncDebug />}
     </main>
   );
 }
