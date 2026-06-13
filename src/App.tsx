@@ -205,7 +205,7 @@ export default function App() {
           <div className="ml-auto flex items-center gap-3">
             <SetPassword />
             <button
-              onClick={() => supabase!.auth.signOut()}
+              onClick={() => supabase!.auth.signOut({ scope: "local" })}
               className="text-xs text-neutral-500 hover:text-neutral-300"
             >
               로그아웃
