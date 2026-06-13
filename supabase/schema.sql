@@ -12,6 +12,7 @@ create table if not exists public.words (
   verb_group  int,                       -- 동사면 1/2/3, 아니면 null
   hanja       jsonb not null default '[]',
   examples    jsonb not null default '[]',
+  freq        int not null default 2,   -- 중요도 1=핵심 2=보통 3=덜 중요
   source      text not null default 'ai' check (source in ('seed','ai')),
   created_at  timestamptz not null default now()
 );

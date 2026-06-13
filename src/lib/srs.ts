@@ -116,16 +116,12 @@ function weightedSample(
   return picked;
 }
 
-/** 단순 무작위 추출 (새 단어 도입용) */
-function randomSample(pool: Word[], count: number, rand: () => number): Word[] {
-  const arr = [...pool];
-  const picked: Word[] = [];
-  const n = Math.min(count, arr.length);
-  for (let i = 0; i < n; i++) {
-    const idx = Math.floor(rand() * arr.length);
-    picked.push(arr.splice(idx, 1)[0]);
-  }
-  return picked;
+/** 새 단어 도입용 추출 — 중요도(freq) 낮은(=핵심) 단어부터, 같은 등급은 무작위 */
+function pickByImportance(pool: Word[], count: number, rand: () => number): Word[] {
+  const sorted = [...pool].sort(
+    (a, b) => (a.freq ?? 2) - (b.freq ?? 2) || rand() - 0.5
+  );
+  return sorted.slice(0, Math.min(count, sorted.length));
 }
 
 function shuffle<T>(arr: T[], rand: () => number): T[] {
@@ -165,7 +161,7 @@ export function buildWorksheet(
     backlog >= BACKLOG_HARD ? 1 : backlog >= BACKLOG_SOFT ? 3 : NEW_PER_SHEET;
 
   const newCount = Math.min(newCap, fresh.length, count);
-  const newPicks = randomSample(fresh, newCount, rand);
+  const newPicks = pickByImportance(fresh, newCount, rand);
   const reviewPicks = weightedSample(
     introduced,
     progress,

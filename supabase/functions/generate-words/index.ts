@@ -48,8 +48,13 @@ const SCHEMA = {
               required: ["jp", "kana", "ko"],
             },
           },
+          freq: {
+            type: "integer",
+            enum: [1, 2, 3],
+            description: "중요도/빈도: 1=핵심(가장 자주 씀) 2=보통 3=덜 중요",
+          },
         },
-        required: ["kanji", "kana", "meaning", "pos", "verbGroup", "hanja", "examples"],
+        required: ["kanji", "kana", "meaning", "pos", "verbGroup", "hanja", "examples", "freq"],
       },
     },
   },
@@ -66,6 +71,7 @@ function prompt(level: string, count: number, exclude: string[]): string {
 - hanja: 각 구성 한자의 한국식 훈독을 "훈 음" 형태로 ("食"→"먹을 식"). 가나 전용 단어는 빈 배열.
 - examples: 단어마다 2개. ${level}에서 이해 가능한 쉬운 어휘로만, jp(한자 포함)·kana(히라가나)·ko(한국어)를 모두 채움.
 - 품사를 다양하게 섞고 ${level} 빈출 단어 위주로.
+- freq: 그 단어의 중요도/사용빈도를 1(핵심·가장 자주)·2(보통)·3(덜 중요)로 매기세요. **가장 중요한 단어(freq=1)부터** 우선 생성.
 - 아래 '이미 있는 단어'와 표제어가 겹치지 않게:
 ${exclude.join(", ")}`;
 }
@@ -124,6 +130,7 @@ function rowsFrom(words: any[], level: string) {
     verb_group: w.pos === "verb" ? w.verbGroup ?? 1 : null,
     hanja: w.hanja ?? [],
     examples: w.examples ?? [],
+    freq: [1, 2, 3].includes(w.freq) ? w.freq : 2,
     source: "ai",
   }));
 }
@@ -145,12 +152,12 @@ Deno.serve(async (req) => {
     const body = await req.json().catch(() => ({}));
     const summary: Record<string, number> = {};
 
-    // 기존 불량 단어 정리 (영어 뜻·깨진 데이터 삭제 — 규칙 기반)
+    // 기존 불량 단어 정리 (가벼운 규칙: 영어 뜻 / 일본어 아닌 표제어) — 메모리 절약 위해 최소 컬럼만
     {
-      const { data: all } = await supabase
-        .from("words")
-        .select("id,kanji,kana,meaning,pos,examples");
-      const badIds = (all ?? []).filter((w: any) => !isValid(w)).map((w: any) => w.id);
+      const { data: all } = await supabase.from("words").select("id,kanji,meaning");
+      const badIds = (all ?? [])
+        .filter((w: any) => !HANGUL.test(w.meaning ?? "") || !JP.test(w.kanji ?? ""))
+        .map((w: any) => w.id);
       if (badIds.length) {
         await supabase.from("words").delete().in("id", badIds);
         summary.cleaned = badIds.length;
@@ -162,13 +169,15 @@ Deno.serve(async (req) => {
     if (body.level) {
       jobs = [{ level: body.level, count: Math.min(body.count ?? PER_RUN_CAP, PER_RUN_CAP) }];
     } else {
-      // 자동 모드: 목표치에 못 미치는 레벨을 보충
+      // 자동 모드: 가장 부족한 레벨 '하나만' 보충 (리소스 한도 회피, 크론이 반복 호출)
       const { data: counts } = await supabase.rpc("word_counts");
       const have: Record<string, number> = {};
       for (const r of counts ?? []) have[r.level] = Number(r.n);
       jobs = Object.entries(TARGET)
         .map(([level, target]) => ({ level, count: Math.min(target - (have[level] ?? 0), PER_RUN_CAP) }))
-        .filter((j) => j.count > 0);
+        .filter((j) => j.count > 0)
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 1);
     }
 
     for (const job of jobs) {

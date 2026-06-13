@@ -35,6 +35,7 @@ interface WordRow {
   verb_group: number | null;
   hanja: Word["hanja"];
   examples: Word["examples"];
+  freq: number | null;
 }
 
 function rowToWord(r: WordRow): Word {
@@ -51,6 +52,7 @@ function rowToWord(r: WordRow): Word {
     type,
     hanja: r.hanja ?? [],
     examples: r.examples ?? [],
+    freq: r.freq ?? 2,
   };
 }
 

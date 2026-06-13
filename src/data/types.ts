@@ -39,6 +39,7 @@ export interface Word {
   type: WordType;
   hanja: Hanja[]; // 구성 한자의 한국식 훈독 (가나 단어면 빈 배열)
   examples: Example[];
+  freq?: number; // 중요도/빈도 등급 1=핵심(가장 먼저) 2=보통 3=덜 중요 (없으면 2로 취급)
 }
 
 /** 표 "활용/품사" 열에 표시할 짧은 라벨 */
