@@ -80,12 +80,12 @@ export function markUnknown(p: Progress, now: number): Progress {
   };
 }
 
-/** 한 학습지에 새로 도입할 새 단어의 기본 개수 */
-const NEW_PER_SHEET = 8;
+/** 한 학습지에 새로 도입할 새 단어의 기본 개수 (속공형: 학습지 1~2장이면 하루 12~24개 신규) */
+const NEW_PER_SHEET = 12;
 /** 아직 안 외운(복습 대기) 단어가 이만큼 쌓이면 새 단어 도입을 줄임 */
-const BACKLOG_SOFT = 18;
+const BACKLOG_SOFT = 35;
 /** 더 쌓이면 새 단어를 거의 멈추고 밀린 것부터 따라잡게 함 */
-const BACKLOG_HARD = 30;
+const BACKLOG_HARD = 60;
 
 /** 가중치 비복원 추출 */
 function weightedSample(
