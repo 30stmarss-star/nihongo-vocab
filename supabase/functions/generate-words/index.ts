@@ -104,11 +104,13 @@ async function generate(apiKey: string, level: string, count: number, exclude: s
 const HANGUL = /[가-힣]/; // 한글
 const JP = /[぀-ヿ一-鿿]/; // 가나 또는 한자
 const KANA = /[぀-ヿ]/; // 가나
+const LATIN = /[A-Za-z]/; // 표제어에 섞이면 안 되는 영문(오염 데이터)
 const POS = ["verb", "i-adj", "na-adj", "noun", "adverb", "expression"];
 
 function isValid(w: any): boolean {
   if (!w || typeof w.kanji !== "string" || typeof w.kana !== "string") return false;
   if (!JP.test(w.kanji)) return false; // 표제어에 일본어가 있어야
+  if (LATIN.test(w.kanji)) return false; // 영문 섞인 깨진 표제어 차단
   if (!KANA.test(w.kana)) return false; // 독음은 가나
   if (!HANGUL.test(w.meaning ?? "")) return false; // 뜻은 한국어(영어 뜻 차단)
   if (!POS.includes(w.pos)) return false;
@@ -156,7 +158,12 @@ Deno.serve(async (req) => {
     {
       const { data: all } = await supabase.from("words").select("id,kanji,meaning");
       const badIds = (all ?? [])
-        .filter((w: any) => !HANGUL.test(w.meaning ?? "") || !JP.test(w.kanji ?? ""))
+        .filter(
+          (w: any) =>
+            !HANGUL.test(w.meaning ?? "") ||
+            !JP.test(w.kanji ?? "") ||
+            LATIN.test(w.kanji ?? ""), // 영문 섞인 오염 표제어도 정리
+        )
         .map((w: any) => w.id);
       if (badIds.length) {
         await supabase.from("words").delete().in("id", badIds);
@@ -180,15 +187,21 @@ Deno.serve(async (req) => {
         .slice(0, 1);
     }
 
+    // 전체 레벨에 이미 있는 표제어 (교차 레벨 중복 방지 — 같은 단어가 N5·N4 양쪽에 들어가는 일 차단)
+    const { data: allKanjiRows } = await supabase.from("words").select("kanji");
+    const haveKanji = new Set((allKanjiRows ?? []).map((r: any) => r.kanji));
+
     for (const job of jobs) {
       const { data: existing } = await supabase
         .from("words")
         .select("kanji")
         .eq("level", job.level);
-      const exclude = (existing ?? []).map((r: any) => r.kanji);
+      const exclude = (existing ?? []).map((r: any) => r.kanji); // 프롬프트 힌트용(같은 레벨)
 
       const words = (await generate(apiKey, job.level, job.count, exclude)).filter(isValid);
-      const rows = rowsFrom(words, job.level).filter((r) => !exclude.includes(r.kanji));
+      // 어느 레벨에든 이미 있는 표제어는 제외
+      const rows = rowsFrom(words, job.level).filter((r) => !haveKanji.has(r.kanji));
+      for (const r of rows) haveKanji.add(r.kanji); // 같은 호출 내 추가 중복도 방지
 
       // (kanji, level) 충돌은 무시하고 새 단어만 삽입
       const { data: inserted, error } = await supabase
