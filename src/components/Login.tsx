@@ -123,6 +123,15 @@ export function Login() {
               ? "비밀번호가 없거나 잊으셨나요? 메일 링크로 로그인"
               : "← 비밀번호로 로그인"}
           </button>
+
+          {mode === "password" && (
+            <p className="mt-1 text-center text-[11px] leading-relaxed text-neutral-600">
+              처음이신가요? 위{" "}
+              <b className="text-neutral-400">메일 링크로 로그인</b>으로 메일 인증을 먼저 하세요.
+              로그인되면 화면 위 <b className="text-neutral-400">🔑 비밀번호</b>에서 비밀번호를
+              설정할 수 있어요.
+            </p>
+          )}
         </form>
       )}
     </main>

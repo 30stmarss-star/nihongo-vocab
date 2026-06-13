@@ -44,7 +44,7 @@ export function SetPassword() {
         <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-white/10 bg-neutral-900 p-3 shadow-xl shadow-black/50">
           <p className="mb-2 text-xs text-neutral-400">
             비밀번호를 정하면 다음부터 <b className="text-neutral-200">메일 없이</b> 로그인할 수
-            있어요(모바일에서 매번 로그인되는 문제 해결).
+            있어요.
           </p>
           <input
             type="password"
