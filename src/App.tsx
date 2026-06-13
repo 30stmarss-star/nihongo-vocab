@@ -20,6 +20,7 @@ import { WordTable } from "./components/WordTable";
 import { WordCard } from "./components/WordCard";
 import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
+import { SetPassword } from "./components/SetPassword";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
@@ -201,12 +202,15 @@ export default function App() {
           ))}
         </select>
         {CLOUD && userId && (
-          <button
-            onClick={() => supabase!.auth.signOut()}
-            className="ml-auto text-xs text-neutral-500 hover:text-neutral-300"
-          >
-            로그아웃
-          </button>
+          <div className="ml-auto flex items-center gap-3">
+            <SetPassword />
+            <button
+              onClick={() => supabase!.auth.signOut()}
+              className="text-xs text-neutral-500 hover:text-neutral-300"
+            >
+              로그아웃
+            </button>
+          </div>
         )}
       </header>
 

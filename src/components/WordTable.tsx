@@ -74,9 +74,13 @@ function WordRow({
         className="no-select w-[34%] shrink-0 cursor-pointer truncate text-left text-base text-white sm:text-lg"
         style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={(e) => onShowCard(word, e.clientX, e.clientY)}
+        onPointerDown={(e) => {
+          // 제스처를 이 요소에 고정 → 손가락 미세 이동/하단 고무줄 스크롤로
+          // pointercancel·pointerleave가 떠서 카드가 즉시 닫히는 것을 막는다.
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          onShowCard(word, e.clientX, e.clientY);
+        }}
         onPointerUp={onHideCard}
-        onPointerLeave={onHideCard}
         onPointerCancel={onHideCard}
       >
         {word.kanji}
@@ -87,9 +91,11 @@ function WordRow({
         className="no-select relative flex-1"
         style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={() => setRevealed(true)}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          setRevealed(true);
+        }}
         onPointerUp={() => setRevealed(false)}
-        onPointerLeave={() => setRevealed(false)}
         onPointerCancel={() => setRevealed(false)}
       >
         <div className="grid grid-cols-2 gap-4">

@@ -17,6 +17,12 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans KR",
     "Noto Sans JP", "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
+  /* 리스트 맨 아래에서 고무줄 스크롤/당겨서새로고침이 꾹누르기 터치를 가로채는 것 방지 */
+  overscroll-behavior: none;
+}
+
+html {
+  overscroll-behavior: none;
 }
 
 /* prevent text selection while press-holding to reveal */
