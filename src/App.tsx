@@ -187,7 +187,7 @@ export default function App() {
 
   // ── 학습 화면 ──
   return (
-    <main className="mx-auto max-w-2xl px-3 py-5 sm:px-5">
+    <main className="mx-auto max-w-2xl px-3 pt-5 pb-28 sm:px-5">
       <header className="mb-3 flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-bold text-white">일본어 단어 암기</h1>
         <select
@@ -257,7 +257,7 @@ export default function App() {
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
               오른쪽 칸을 <b className="text-neutral-300">꾹 누르면</b> 정답이 잠깐
-              보이고, 왼쪽 <b className="text-neutral-300">단어를 누르면</b> 카드가 떠요.
+              보이고, 왼쪽 <b className="text-neutral-300">단어를 누르면</b> 상세 카드가 떠요(다시 누르면 닫힘).
             </p>
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <select
@@ -284,8 +284,9 @@ export default function App() {
           <WordTable
             words={worksheet}
             progress={progress}
-            onShowCard={(word, x, y) => setCard({ word, x, y })}
-            onHideCard={() => setCard(null)}
+            onShowCard={(word, x, y) =>
+              setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+            }
             onKnown={(id) => update(id, markKnown)}
             onUnknown={(id) => update(id, markUnknown)}
           />
@@ -306,15 +307,27 @@ export default function App() {
           <WordTable
             words={learnedWords}
             progress={progress}
-            onShowCard={(word, x, y) => setCard({ word, x, y })}
-            onHideCard={() => setCard(null)}
+            onShowCard={(word, x, y) =>
+              setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+            }
             onKnown={(id) => update(id, markKnown)}
             onUnknown={(id) => update(id, markUnknown)}
           />
         </>
       )}
 
-      {card && <WordCard word={card.word} x={card.x} y={card.y} />}
+      {card && (
+        <>
+          {/* 바깥(또는 카드)을 탭하면 닫힘 */}
+          <button
+            type="button"
+            aria-label="카드 닫기"
+            className="fixed inset-0 z-40 cursor-default"
+            onClick={() => setCard(null)}
+          />
+          <WordCard word={card.word} x={card.x} y={card.y} />
+        </>
+      )}
     </main>
   );
 }

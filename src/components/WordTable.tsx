@@ -6,7 +6,6 @@ interface Props {
   words: Word[];
   progress: Record<string, Progress | undefined>;
   onShowCard: (word: Word, x: number, y: number) => void;
-  onHideCard: () => void;
   onKnown: (id: string) => void;
   onUnknown: (id: string) => void;
 }
@@ -37,7 +36,6 @@ function WordRow({
   word,
   progress,
   onShowCard,
-  onHideCard,
   onKnown,
   onUnknown,
 }: { word: Word } & Omit<Props, "words">) {
@@ -72,16 +70,8 @@ function WordRow({
       <button
         type="button"
         className="no-select w-[34%] shrink-0 cursor-pointer truncate text-left text-base text-white sm:text-lg"
-        style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={(e) => {
-          // 제스처를 이 요소에 고정 → 손가락 미세 이동/하단 고무줄 스크롤로
-          // pointercancel·pointerleave가 떠서 카드가 즉시 닫히는 것을 막는다.
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-          onShowCard(word, e.clientX, e.clientY);
-        }}
-        onPointerUp={onHideCard}
-        onPointerCancel={onHideCard}
+        onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
       >
         {word.kanji}
       </button>
