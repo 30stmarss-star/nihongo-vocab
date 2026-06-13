@@ -7,3 +7,5 @@ dist
 .DS_Store
 .supabase
 tsconfig.tsbuildinfo
+# 로컬 참고용 원본 자료 — 저장소/배포에 포함하지 않음
+words/
