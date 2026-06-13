@@ -70,6 +70,16 @@ curl -X POST https://YOUR-PROJECT.supabase.co/functions/v1/generate-words \
 # → {"ok":true,"added":{"N3":20}}  (본문 없이 호출하면 부족한 레벨을 자동 보충)
 ```
 
+### 대화형 튜터(tutor-chat) 배포
+앱의 **튜터 💬** 탭이 쓰는 함수입니다. `generate-words` 와 같은 `ANTHROPIC_API_KEY` 를 공유합니다.
+```bash
+# generate-words 와 달리 --no-verify-jwt 를 붙이지 않는다 → 로그인한 사용자만 호출 가능
+supabase functions deploy tutor-chat
+```
+> 프론트의 \`supabase.functions.invoke("tutor-chat", …)\` 가 로그인 사용자의 토큰을 자동으로 실어 보내고,
+> Supabase가 JWT를 검증하므로 별도 비밀키(x-secret)가 필요 없습니다. 비로그인/로컬 모드에선 탭이 보이지 않습니다.
+> 모델/말투를 바꾸려면 \`supabase/functions/tutor-chat/index.ts\` 의 \`MODEL\`·\`SYSTEM\` 을 수정하세요.
+
 ## 6. 자동(크론) — 컴퓨터 없이 매일 확장
 1) 대시보드 → **Database → Extensions**에서 **`pg_cron`** 과 **`pg_net`** 을 켭니다.
 2) **SQL Editor**에서 아래 실행(매일 1회 함수 호출). `<ANON_KEY>`는 anon public 키:

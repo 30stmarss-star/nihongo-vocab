@@ -3,7 +3,10 @@ import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
 import { VitePWA } from "vite-plugin-pwa";
 
-export default defineConfig({
+// GitHub Pages는 /nihongo-vocab/ 하위 경로로 서빙되므로 빌드 시 base를 맞춘다.
+// (dev 서버는 base "/" 로 두어 로컬 개발 경로를 깔끔하게 유지)
+export default defineConfig(({ command }) => ({
+  base: command === "build" ? "/nihongo-vocab/" : "/",
   plugins: [
     react(),
     tailwindcss(),
@@ -22,4 +25,4 @@ export default defineConfig({
       },
     }),
   ],
-});
+}));

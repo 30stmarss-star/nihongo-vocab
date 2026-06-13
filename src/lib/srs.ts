@@ -170,5 +170,17 @@ export function buildWorksheet(
     rand
   );
 
-  return shuffle([...newPicks, ...reviewPicks], rand);
+  // 복습 풀이 작아 칸이 남으면(특히 맨 처음: 본 단어가 0개) 새 단어로 마저 채워
+  // 학습지를 항상 count만큼 채운다. 복습이 쌓이면 자연히 채울 일이 없어진다.
+  const shortfall = count - newPicks.length - reviewPicks.length;
+  const extraPicks =
+    shortfall > 0
+      ? pickByImportance(
+          fresh.filter((w) => !newPicks.includes(w)),
+          shortfall,
+          rand
+        )
+      : [];
+
+  return shuffle([...newPicks, ...reviewPicks, ...extraPicks], rand);
 }

@@ -1,0 +1,42 @@
+name: Deploy to GitHub Pages
+
+# main 에 push하면 자동으로 빌드해서 gh-pages 브랜치로 배포한다.
+# (수동 실행도 가능: Actions 탭 → Run workflow)
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# 동시에 여러 배포가 겹치지 않게 (마지막 push만 반영)
+concurrency:
+  group: pages-deploy
+  cancel-in-progress: true
+
+jobs:
+  build-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build
+        run: npm run build
+        env:
+          # anon 키·URL은 공개돼도 안전(프론트 번들에 포함되며 RLS로 보호).
+          VITE_SUPABASE_URL: https://auvcrexjkoxvymzytlxp.supabase.co
+          VITE_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImF1dmNyZXhqa294dnltenl0bHhwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODEzMTkyNDQsImV4cCI6MjA5Njg5NTI0NH0.F_BlgGokT7mwzOBfxxVPg_68SJw8ZHq2XaEqNeX5uJo
+
+      - name: Deploy to gh-pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./dist

@@ -2,10 +2,12 @@
 
 JLPT 단어 암기 웹앱. 난이도(N5·N4 / N3 / N2) 선택, 가림/꾹눌러보기, 상세 카드,
 간격반복(SRS) + 중요도 우선 학습지, 외운 단어 모아보기, 오프라인(PWA) 지원.
+**대화형 튜터(💬)**: 한국어로 쓰면 일본어로 답+해설, 일본어를 한글 발음으로 쓰면 정식 표기로 교정+해설(단어·한자훈독·JLPT 급수).
 
 - **배포 주소**: https://30stmarss-star.github.io/nihongo-vocab/
 - 백엔드: Supabase (Postgres + Auth + Edge Function + cron)
 - 단어 자동 확장: Edge Function `generate-words` 가 Claude API로 단어 생성 → DB 저장
+- 대화형 튜터: Edge Function `tutor-chat` 이 Claude API(`claude-opus-4-8`) 호출 (키는 서버 전용)
 
 > 앱을 **쓰기만** 할 거면 위 주소로 접속해 로그인하면 끝(어느 기기든 동기화).
 > 아래는 **다른 컴퓨터에서 개발/배포**할 때의 세팅입니다.

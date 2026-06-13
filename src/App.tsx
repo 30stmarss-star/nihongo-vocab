@@ -19,10 +19,11 @@ import { CLOUD, supabase } from "./lib/supabase";
 import { WordTable } from "./components/WordTable";
 import { WordCard } from "./components/WordCard";
 import { Login } from "./components/Login";
+import { Chat } from "./components/Chat";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
-type View = "study" | "learned";
+type View = "study" | "learned" | "tutor";
 type Phase = "loading" | "login" | "ready";
 
 export default function App() {
@@ -231,9 +232,23 @@ export default function App() {
         >
           외운 단어 {learnedWords.length}
         </button>
+        {CLOUD && userId && (
+          <button
+            onClick={() => setView("tutor")}
+            className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+              view === "tutor"
+                ? "bg-neutral-700 text-white"
+                : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            튜터 💬
+          </button>
+        )}
       </div>
 
-      {view === "study" ? (
+      {view === "tutor" ? (
+        <Chat />
+      ) : view === "study" ? (
         <>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
