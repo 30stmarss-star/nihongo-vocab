@@ -95,14 +95,17 @@ function WordRow({
       </div>
 
       {/* 암기 체크 (토글) */}
-      <div className="flex w-[56px] shrink-0 items-center justify-center">
+      <div className="no-select flex w-[56px] shrink-0 items-center justify-center">
         <button
           type="button"
           aria-label={known ? "암기 해제" : "암기 완료"}
           aria-pressed={known}
+          draggable={false}
           onClick={toggle}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ touchAction: "manipulation" }}
           className={[
-            "grid h-8 w-8 place-items-center rounded-full text-sm transition active:scale-90",
+            "no-select grid h-8 w-8 place-items-center rounded-full text-sm transition active:scale-90",
             known
               ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
               : "border border-white/25 text-transparent hover:border-emerald-400/70",
