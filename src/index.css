@@ -1,0 +1,40 @@
+@import "tailwindcss";
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: #0f0f10;
+  color: #f3f4f6;
+  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans KR",
+    "Noto Sans JP", "Segoe UI", sans-serif;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* prevent text selection while press-holding to reveal */
+.no-select {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+@keyframes floatUp {
+  0% {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  30% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(-14px);
+  }
+}
