@@ -112,6 +112,7 @@ function isValid(w: any): boolean {
   if (!JP.test(w.kanji)) return false; // 표제어에 일본어가 있어야
   if (LATIN.test(w.kanji)) return false; // 영문 섞인 깨진 표제어 차단
   if (!KANA.test(w.kana)) return false; // 독음은 가나
+  if (LATIN.test(w.kana)) return false; // 독음에 영문 섞인 오염 차단
   if (!HANGUL.test(w.meaning ?? "")) return false; // 뜻은 한국어(영어 뜻 차단)
   if (!POS.includes(w.pos)) return false;
   if (!Array.isArray(w.examples) || w.examples.length === 0) return false;
@@ -156,13 +157,14 @@ Deno.serve(async (req) => {
 
     // 기존 불량 단어 정리 (가벼운 규칙: 영어 뜻 / 일본어 아닌 표제어) — 메모리 절약 위해 최소 컬럼만
     {
-      const { data: all } = await supabase.from("words").select("id,kanji,meaning");
+      const { data: all } = await supabase.from("words").select("id,kanji,kana,meaning");
       const badIds = (all ?? [])
         .filter(
           (w: any) =>
             !HANGUL.test(w.meaning ?? "") ||
             !JP.test(w.kanji ?? "") ||
-            LATIN.test(w.kanji ?? ""), // 영문 섞인 오염 표제어도 정리
+            LATIN.test(w.kanji ?? "") || // 영문 섞인 오염 표제어
+            LATIN.test(w.kana ?? ""), // 영문 섞인 오염 독음
         )
         .map((w: any) => w.id);
       if (badIds.length) {
