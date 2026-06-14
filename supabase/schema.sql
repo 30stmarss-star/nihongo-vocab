@@ -7,7 +7,7 @@ create table if not exists public.words (
   kanji       text not null,
   kana        text not null,
   meaning     text not null,
-  level       text not null check (level in ('N5','N4','N3','N2')),
+  level       text not null check (level in ('N5','N4','N3','N2','N1')),
   pos         text not null check (pos in ('verb','i-adj','na-adj','noun','adverb','expression')),
   verb_group  int,                       -- 동사면 1/2/3, 아니면 null
   hanja       jsonb not null default '[]',
@@ -31,7 +31,7 @@ create policy "words readable by all" on public.words
 -- ─────────────────────── 사용자 설정 ───────────────────────
 create table if not exists public.user_settings (
   user_id        uuid primary key references auth.users(id) on delete cascade,
-  band           text check (band in ('N5N4','N3','N2')),
+  band           text check (band in ('N5N4','N3','N2','N1')),
   worksheet_size int not null default 15,
   updated_at     timestamptz not null default now()
 );

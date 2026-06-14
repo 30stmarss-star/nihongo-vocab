@@ -1,12 +1,13 @@
-export type Level = "N5" | "N4" | "N3" | "N2";
+export type Level = "N5" | "N4" | "N3" | "N2" | "N1";
 
 /** 사용자가 고르는 난이도 묶음 */
-export type Band = "N5N4" | "N3" | "N2";
+export type Band = "N5N4" | "N3" | "N2" | "N1";
 
 export const BANDS: { id: Band; label: string; levels: Level[] }[] = [
   { id: "N5N4", label: "N5 · N4 (입문)", levels: ["N5", "N4"] },
   { id: "N3", label: "N3 (중급)", levels: ["N3"] },
   { id: "N2", label: "N2 (중상급)", levels: ["N2"] },
+  { id: "N1", label: "N1 (최상급)", levels: ["N1"] },
 ];
 
 /** 품사 / 활용 종류 */
