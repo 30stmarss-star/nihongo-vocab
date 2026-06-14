@@ -9,3 +9,5 @@ dist
 tsconfig.tsbuildinfo
 # 로컬 참고용 원본 자료 — 저장소/배포에 포함하지 않음
 words/
+# 로컬 전용 키 파일 (절대 커밋/배포 안 함)
+.env.annotate
