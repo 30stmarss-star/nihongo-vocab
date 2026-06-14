@@ -37,6 +37,8 @@ export default function App() {
   const [band, setBand] = useState<Band | null>(null);
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [view, setView] = useState<View>("study");
+  // 외운 단어 뷰: false=일본어 보기(뜻 가림), true=뜻 보기(단어·독음 가림, 거꾸로 복습)
+  const [learnedReverse, setLearnedReverse] = useState(false);
   const [worksheet, setWorksheet] = useState<Word[]>([]);
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(
     null
@@ -300,13 +302,24 @@ export default function App() {
         </div>
       ) : (
         <>
-          <p className="mb-3 text-xs text-neutral-500">
-            지금까지 외운 단어예요. ✓ 를 다시 누르면 목록에서 빠지고 다시 자주
-            나와요.
-          </p>
+          <div className="mb-3 flex items-center gap-2">
+            <p className="text-xs text-neutral-500">
+              {learnedReverse
+                ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
+                : "지금까지 외운 단어예요. ✓ 를 다시 누르면 목록에서 빠져요."}
+            </p>
+            <button
+              onClick={() => setLearnedReverse((v) => !v)}
+              className="ml-auto shrink-0 rounded-lg border border-white/10 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-emerald-400/50"
+              title="보기 방향 전환"
+            >
+              {learnedReverse ? "뜻 → 단어 ✓" : "단어 → 뜻"}
+            </button>
+          </div>
           <WordTable
             words={learnedWords}
             progress={progress}
+            mode={learnedReverse ? "ko" : "jp"}
             onShowCard={(word, x, y) =>
               setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
             }
