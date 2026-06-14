@@ -189,7 +189,7 @@ export default function App() {
 
   // ── 학습 화면 ──
   return (
-    <main className="mx-auto max-w-2xl px-3 pt-5 pb-28 sm:px-5">
+    <main className="mx-auto max-w-2xl px-3 pt-5 pb-[calc(9rem_+_env(safe-area-inset-bottom))] sm:px-5">
       <header className="mb-3 flex flex-wrap items-center gap-3">
         <h1 className="text-lg font-bold text-white">일본어 단어 암기</h1>
         <select
