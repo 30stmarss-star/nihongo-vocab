@@ -11,6 +11,7 @@ import {
 } from "./lib/srs";
 import {
   DEFAULT_SIZE,
+  loadCachedSession,
   loadSession,
   persistProgress,
   persistSettings,
@@ -70,19 +71,56 @@ export default function App() {
   }, []);
 
   async function init(uid: string | null) {
-    setPhase("loading");
+    // 1) 캐시가 있으면 네트워크를 기다리지 않고 즉시 화면을 띄운다(체감 로딩 대폭 단축).
+    const cached = loadCachedSession(uid);
+    let shownSheet: Word[] | null = null;
+    let shownBand: Band | null = null;
+    if (cached && cached.words.length) {
+      setWords(cached.words);
+      setProgress(cached.progress);
+      setSize(cached.size);
+      if (cached.band) {
+        setBand(cached.band);
+        const { sheet } = makeSheet(cached.band, cached.size, cached.progress, cached.words);
+        setWorksheet(sheet);
+        shownSheet = sheet;
+        shownBand = cached.band;
+      }
+      setPhase("ready");
+    } else {
+      setPhase("loading");
+    }
+
+    // 2) 서버에서 최신 데이터를 받아 백그라운드로 반영한다.
     const s = await loadSession(uid);
     setWords(s.words);
-    setProgress(s.progress);
     setSize(s.size);
-    if (s.band) {
+
+    if (s.band && shownSheet && s.band === shownBand) {
+      // 이미 캐시로 보여준 학습지는 유지한다(buildWorksheet가 무작위라 다시 만들면 바뀜).
+      // 진행상황만 갱신하고, 보여준 학습지의 '도입' 기록은 보존한다.
+      setBand(s.band);
+      const now = Date.now();
+      const next = { ...s.progress };
+      const changed: string[] = [];
+      for (const w of shownSheet) {
+        const intro = introduce(next[w.id], now);
+        if (intro !== next[w.id]) {
+          next[w.id] = intro;
+          changed.push(w.id);
+        }
+      }
+      setProgress(next);
+      if (changed.length) persistProgress(uid, next, changed);
+    } else if (s.band) {
+      // 캐시가 없었거나(첫 방문) 밴드가 달라졌으면 학습지를 새로 만든다.
       setBand(s.band);
       const { sheet, next, changed } = makeSheet(s.band, s.size, s.progress, s.words);
+      setProgress(next);
       setWorksheet(sheet);
-      if (changed.length) {
-        setProgress(next);
-        persistProgress(uid, next, changed);
-      }
+      if (changed.length) persistProgress(uid, next, changed);
+    } else {
+      setProgress(s.progress);
     }
     setPhase("ready");
   }
