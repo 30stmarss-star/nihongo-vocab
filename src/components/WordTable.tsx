@@ -100,22 +100,24 @@ function WordRow({
         <span className={ko ? "line-clamp-2" : "truncate"}>{promptText}</span>
       </button>
 
-      {/* 정답(가림) 영역: 탭하면 토글로 드러남(다시 탭하면 가림).
-          꾹 누르기와 달리 손가락이 글자를 덮지 않고, 행 전체 높이가 터치 판정이라 굵은 손가락도 쉽다. */}
-      <button
-        type="button"
-        aria-pressed={revealed}
-        aria-label={revealed ? "정답 가리기" : "정답 보기"}
-        className="no-select relative flex flex-1 cursor-pointer items-center py-2.5 text-left"
-        style={{ touchAction: "manipulation" }}
+      {/* 정답(가림) 영역: 꾹 누르고 있는 동안만 보임.
+          행 전체 높이가 터치 판정이라 굵은 손가락도 쉽게 눌린다. */}
+      <div
+        className="no-select relative flex flex-1 cursor-pointer items-center py-2.5"
+        style={{ touchAction: "none" }}
         onContextMenu={(e) => e.preventDefault()}
-        onClick={() => setRevealed((v) => !v)}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture?.(e.pointerId);
+          setRevealed(true);
+        }}
+        onPointerUp={() => setRevealed(false)}
+        onPointerCancel={() => setRevealed(false)}
       >
         <div className="grid w-full grid-cols-2 gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
-      </button>
+      </div>
 
       {/* 암기 체크 (토글) */}
       <div className="no-select flex w-[56px] shrink-0 items-center justify-center">
