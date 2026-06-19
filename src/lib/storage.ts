@@ -31,3 +31,27 @@ export function loadBand(): Band | null {
 export function saveBand(band: Band): void {
   localStorage.setItem(BAND_KEY, band);
 }
+
+// ── 닮은꼴 한자: 외운 묶음(group_id) 목록 ──
+// 클라우드 progress 테이블은 words 외래키에 묶여 있어 닮은꼴 그룹을 못 넣는다.
+// 그래서 닮은꼴은 기기별 localStorage(유저 구분 키)로만 보관한다.
+const confusableKey = (uid: string | null) =>
+  `nihongo.confusable.memorized.${uid ?? "local"}`;
+
+export function loadConfusableMemorized(uid: string | null): string[] {
+  try {
+    const raw = localStorage.getItem(confusableKey(uid));
+    const arr = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(arr) ? (arr as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveConfusableMemorized(uid: string | null, ids: string[]): void {
+  try {
+    localStorage.setItem(confusableKey(uid), JSON.stringify(ids));
+  } catch {
+    /* 저장 실패는 조용히 무시 */
+  }
+}

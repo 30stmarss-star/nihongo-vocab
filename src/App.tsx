@@ -266,7 +266,7 @@ export default function App() {
       {view === "tutor" ? (
         <Chat />
       ) : view === "kanji" ? (
-        <ConfusableCards />
+        <ConfusableCards userId={userId} />
       ) : view === "study" ? (
         <>
           <div className="mb-3 flex items-center gap-2">
