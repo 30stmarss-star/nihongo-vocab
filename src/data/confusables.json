@@ -1306,6 +1306,397 @@
           }
         }
       ]
+    },
+    {
+      "group_id": "g37",
+      "group_label": "手 vs 毛 (아래 획)",
+      "kanji": [
+        {
+          "kanji": "手",
+          "distinguish_ko": "마지막이 곧게 내려와 갈고리(亅)",
+          "meaning_ko": "손",
+          "reading_key": "て·シュ",
+          "example": {
+            "word": "手",
+            "reading": "て",
+            "meaning_ko": "손"
+          }
+        },
+        {
+          "kanji": "毛",
+          "distinguish_ko": "마지막 획이 오른쪽 위로 휘어 올라감",
+          "meaning_ko": "털",
+          "reading_key": "け·モウ",
+          "example": {
+            "word": "毛",
+            "reading": "け",
+            "meaning_ko": "털"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g38",
+      "group_label": "小 vs 少 (삐침 한 획)",
+      "kanji": [
+        {
+          "kanji": "小",
+          "distinguish_ko": "가운데 갈고리 + 양옆 점, 획 적음",
+          "meaning_ko": "작다",
+          "reading_key": "ちい(さい)·ショウ",
+          "example": {
+            "word": "小さい",
+            "reading": "ちいさい",
+            "meaning_ko": "작다"
+          }
+        },
+        {
+          "kanji": "少",
+          "distinguish_ko": "小 위에 삐침(ノ) 한 획이 더 있음",
+          "meaning_ko": "적다",
+          "reading_key": "すく(ない)·ショウ",
+          "example": {
+            "word": "少ない",
+            "reading": "すくない",
+            "meaning_ko": "적다"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g39",
+      "group_label": "方 vs 万 (머리 점)",
+      "kanji": [
+        {
+          "kanji": "方",
+          "distinguish_ko": "맨 위에 점(丶)이 있는 亠 머리",
+          "meaning_ko": "방향·분",
+          "reading_key": "かた·ホウ",
+          "example": {
+            "word": "方法",
+            "reading": "ほうほう",
+            "meaning_ko": "방법"
+          }
+        },
+        {
+          "kanji": "万",
+          "distinguish_ko": "점 없이 一로 시작, 획 더 적음",
+          "meaning_ko": "만(10000)",
+          "reading_key": "マン·バン",
+          "example": {
+            "word": "一万",
+            "reading": "いちまん",
+            "meaning_ko": "1만"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g40",
+      "group_label": "天 vs 夫 (윗부분)",
+      "kanji": [
+        {
+          "kanji": "天",
+          "distinguish_ko": "윗 가로획이 짧음(아래가 더 긺)",
+          "meaning_ko": "하늘",
+          "reading_key": "テン·あめ",
+          "example": {
+            "word": "天気",
+            "reading": "てんき",
+            "meaning_ko": "날씨"
+          }
+        },
+        {
+          "kanji": "夫",
+          "distinguish_ko": "가로 2획에 세로가 맨 위로 뚫고 나옴",
+          "meaning_ko": "남편",
+          "reading_key": "おっと·フ",
+          "example": {
+            "word": "夫",
+            "reading": "おっと",
+            "meaning_ko": "남편"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g41",
+      "group_label": "同 vs 向 (冂 속)",
+      "kanji": [
+        {
+          "kanji": "同",
+          "distinguish_ko": "위가 평평한 가로(一)",
+          "meaning_ko": "같다",
+          "reading_key": "おな(じ)·ドウ",
+          "example": {
+            "word": "同じ",
+            "reading": "おなじ",
+            "meaning_ko": "같다"
+          }
+        },
+        {
+          "kanji": "向",
+          "distinguish_ko": "왼쪽 위에 삐침(丿)이 튀어나옴",
+          "meaning_ko": "향하다",
+          "reading_key": "む(く)·コウ",
+          "example": {
+            "word": "向く",
+            "reading": "むく",
+            "meaning_ko": "향하다"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g42",
+      "group_label": "見 vs 貝 (아래 부품)",
+      "kanji": [
+        {
+          "kanji": "見",
+          "distinguish_ko": "目 아래가 儿(두 다리)",
+          "meaning_ko": "보다",
+          "reading_key": "み(る)·ケン",
+          "example": {
+            "word": "見る",
+            "reading": "みる",
+            "meaning_ko": "보다"
+          }
+        },
+        {
+          "kanji": "貝",
+          "distinguish_ko": "目 아래가 八(두 점)",
+          "meaning_ko": "조개",
+          "reading_key": "かい·バイ",
+          "example": {
+            "word": "貝",
+            "reading": "かい",
+            "meaning_ko": "조개"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g43",
+      "group_label": "母 vs 毎 (머리)",
+      "kanji": [
+        {
+          "kanji": "母",
+          "distinguish_ko": "머리 없는 기본자, 점 2개",
+          "meaning_ko": "어머니",
+          "reading_key": "はは·ボ",
+          "example": {
+            "word": "母",
+            "reading": "はは",
+            "meaning_ko": "어머니"
+          }
+        },
+        {
+          "kanji": "毎",
+          "distinguish_ko": "母 위에 𠂉(ノ+一) 머리가 얹힘",
+          "meaning_ko": "매번",
+          "reading_key": "マイ·ごと",
+          "example": {
+            "word": "毎日",
+            "reading": "まいにち",
+            "meaning_ko": "매일"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g44",
+      "group_label": "化 vs 花 (초두 유무)",
+      "kanji": [
+        {
+          "kanji": "化",
+          "distinguish_ko": "亻+匕만, 머리 없음",
+          "meaning_ko": "되다·변하다",
+          "reading_key": "カ·ケ·ば(ける)",
+          "example": {
+            "word": "文化",
+            "reading": "ぶんか",
+            "meaning_ko": "문화"
+          }
+        },
+        {
+          "kanji": "花",
+          "distinguish_ko": "化 위에 艹(초두머리)가 있음",
+          "meaning_ko": "꽃",
+          "reading_key": "はな·カ",
+          "example": {
+            "word": "花",
+            "reading": "はな",
+            "meaning_ko": "꽃"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": [
+        {
+          "kanji": "聞",
+          "distinguish_ko": "門 안에 耳(귀)",
+          "meaning_ko": "듣다",
+          "reading_key": "き(く)·ブン",
+          "example": {
+            "word": "聞く",
+            "reading": "きく",
+            "meaning_ko": "듣다"
+          }
+        },
+        {
+          "kanji": "開",
+          "distinguish_ko": "門 안에 廾(받쳐든 두 손)",
+          "meaning_ko": "열다",
+          "reading_key": "ひら(く)·あ(ける)·カイ",
+          "example": {
+            "word": "開ける",
+            "reading": "あける",
+            "meaning_ko": "열다"
+          }
+        },
+        {
+          "kanji": "間",
+          "distinguish_ko": "門 안에 日(날)",
+          "meaning_ko": "사이·시간",
+          "reading_key": "あいだ·カン",
+          "example": {
+            "word": "時間",
+            "reading": "じかん",
+            "meaning_ko": "시간"
+          }
+        },
+        {
+          "kanji": "問",
+          "distinguish_ko": "門 안에 口(입)",
+          "meaning_ko": "묻다",
+          "reading_key": "と(う)·モン",
+          "example": {
+            "word": "問題",
+            "reading": "もんだい",
+            "meaning_ko": "문제"
+          }
+        },
+        {
+          "kanji": "閉",
+          "distinguish_ko": "門 안에 才(빗장)",
+          "meaning_ko": "닫다",
+          "reading_key": "し(める)·と(じる)·ヘイ",
+          "example": {
+            "word": "閉める",
+            "reading": "しめる",
+            "meaning_ko": "닫다"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g46",
+      "group_label": "雨 머리 아래 무엇이 (雪·雲·電)",
+      "kanji": [
+        {
+          "kanji": "雪",
+          "distinguish_ko": "雨 아래에 ヨ(빗자루 모양)",
+          "meaning_ko": "눈",
+          "reading_key": "ゆき·セツ",
+          "example": {
+            "word": "雪",
+            "reading": "ゆき",
+            "meaning_ko": "눈"
+          }
+        },
+        {
+          "kanji": "雲",
+          "distinguish_ko": "雨 아래에 云",
+          "meaning_ko": "구름",
+          "reading_key": "くも·ウン",
+          "example": {
+            "word": "雲",
+            "reading": "くも",
+            "meaning_ko": "구름"
+          }
+        },
+        {
+          "kanji": "電",
+          "distinguish_ko": "雨 아래에 电(申, 번개)",
+          "meaning_ko": "전기",
+          "reading_key": "デン",
+          "example": {
+            "word": "電気",
+            "reading": "でんき",
+            "meaning_ko": "전기"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g47",
+      "group_label": "左 vs 友 vs 有 (ナ 머리 아래)",
+      "kanji": [
+        {
+          "kanji": "左",
+          "distinguish_ko": "ナ 아래가 工(장인 공)",
+          "meaning_ko": "왼쪽",
+          "reading_key": "ひだり·サ",
+          "example": {
+            "word": "左",
+            "reading": "ひだり",
+            "meaning_ko": "왼쪽"
+          }
+        },
+        {
+          "kanji": "友",
+          "distinguish_ko": "ナ 아래가 又(또 우)",
+          "meaning_ko": "친구",
+          "reading_key": "とも·ユウ",
+          "example": {
+            "word": "友達",
+            "reading": "ともだち",
+            "meaning_ko": "친구"
+          }
+        },
+        {
+          "kanji": "有",
+          "distinguish_ko": "ナ 아래가 月(달 월)",
+          "meaning_ko": "있다·가지다",
+          "reading_key": "あ(る)·ユウ",
+          "example": {
+            "word": "有名",
+            "reading": "ゆうめい",
+            "meaning_ko": "유명"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g48",
+      "group_label": "名 vs 各 (윗부분)",
+      "kanji": [
+        {
+          "kanji": "名",
+          "distinguish_ko": "위가 夕(저녁 석) + 아래 口",
+          "meaning_ko": "이름",
+          "reading_key": "な·メイ",
+          "example": {
+            "word": "名前",
+            "reading": "なまえ",
+            "meaning_ko": "이름"
+          }
+        },
+        {
+          "kanji": "各",
+          "distinguish_ko": "위가 夂(뒤져올 치) + 아래 口",
+          "meaning_ko": "각각",
+          "reading_key": "おのおの·カク",
+          "example": {
+            "word": "各自",
+            "reading": "かくじ",
+            "meaning_ko": "각자"
+          }
+        }
+      ]
     }
   ],
   "cards_flat": [
@@ -2397,6 +2788,325 @@
       "example_word": "烏",
       "example_reading": "からす",
       "example_meaning_ko": "까마귀"
+    },
+    {
+      "group_id": "g37",
+      "group_label": "手 vs 毛 (아래 획)",
+      "kanji": "手",
+      "distinguish_ko": "마지막이 곧게 내려와 갈고리(亅)",
+      "meaning_ko": "손",
+      "reading_key": "て·シュ",
+      "example_word": "手",
+      "example_reading": "て",
+      "example_meaning_ko": "손"
+    },
+    {
+      "group_id": "g37",
+      "group_label": "手 vs 毛 (아래 획)",
+      "kanji": "毛",
+      "distinguish_ko": "마지막 획이 오른쪽 위로 휘어 올라감",
+      "meaning_ko": "털",
+      "reading_key": "け·モウ",
+      "example_word": "毛",
+      "example_reading": "け",
+      "example_meaning_ko": "털"
+    },
+    {
+      "group_id": "g38",
+      "group_label": "小 vs 少 (삐침 한 획)",
+      "kanji": "小",
+      "distinguish_ko": "가운데 갈고리 + 양옆 점, 획 적음",
+      "meaning_ko": "작다",
+      "reading_key": "ちい(さい)·ショウ",
+      "example_word": "小さい",
+      "example_reading": "ちいさい",
+      "example_meaning_ko": "작다"
+    },
+    {
+      "group_id": "g38",
+      "group_label": "小 vs 少 (삐침 한 획)",
+      "kanji": "少",
+      "distinguish_ko": "小 위에 삐침(ノ) 한 획이 더 있음",
+      "meaning_ko": "적다",
+      "reading_key": "すく(ない)·ショウ",
+      "example_word": "少ない",
+      "example_reading": "すくない",
+      "example_meaning_ko": "적다"
+    },
+    {
+      "group_id": "g39",
+      "group_label": "方 vs 万 (머리 점)",
+      "kanji": "方",
+      "distinguish_ko": "맨 위에 점(丶)이 있는 亠 머리",
+      "meaning_ko": "방향·분",
+      "reading_key": "かた·ホウ",
+      "example_word": "方法",
+      "example_reading": "ほうほう",
+      "example_meaning_ko": "방법"
+    },
+    {
+      "group_id": "g39",
+      "group_label": "方 vs 万 (머리 점)",
+      "kanji": "万",
+      "distinguish_ko": "점 없이 一로 시작, 획 더 적음",
+      "meaning_ko": "만(10000)",
+      "reading_key": "マン·バン",
+      "example_word": "一万",
+      "example_reading": "いちまん",
+      "example_meaning_ko": "1만"
+    },
+    {
+      "group_id": "g40",
+      "group_label": "天 vs 夫 (윗부분)",
+      "kanji": "天",
+      "distinguish_ko": "윗 가로획이 짧음(아래가 더 긺)",
+      "meaning_ko": "하늘",
+      "reading_key": "テン·あめ",
+      "example_word": "天気",
+      "example_reading": "てんき",
+      "example_meaning_ko": "날씨"
+    },
+    {
+      "group_id": "g40",
+      "group_label": "天 vs 夫 (윗부분)",
+      "kanji": "夫",
+      "distinguish_ko": "가로 2획에 세로가 맨 위로 뚫고 나옴",
+      "meaning_ko": "남편",
+      "reading_key": "おっと·フ",
+      "example_word": "夫",
+      "example_reading": "おっと",
+      "example_meaning_ko": "남편"
+    },
+    {
+      "group_id": "g41",
+      "group_label": "同 vs 向 (冂 속)",
+      "kanji": "同",
+      "distinguish_ko": "위가 평평한 가로(一)",
+      "meaning_ko": "같다",
+      "reading_key": "おな(じ)·ドウ",
+      "example_word": "同じ",
+      "example_reading": "おなじ",
+      "example_meaning_ko": "같다"
+    },
+    {
+      "group_id": "g41",
+      "group_label": "同 vs 向 (冂 속)",
+      "kanji": "向",
+      "distinguish_ko": "왼쪽 위에 삐침(丿)이 튀어나옴",
+      "meaning_ko": "향하다",
+      "reading_key": "む(く)·コウ",
+      "example_word": "向く",
+      "example_reading": "むく",
+      "example_meaning_ko": "향하다"
+    },
+    {
+      "group_id": "g42",
+      "group_label": "見 vs 貝 (아래 부품)",
+      "kanji": "見",
+      "distinguish_ko": "目 아래가 儿(두 다리)",
+      "meaning_ko": "보다",
+      "reading_key": "み(る)·ケン",
+      "example_word": "見る",
+      "example_reading": "みる",
+      "example_meaning_ko": "보다"
+    },
+    {
+      "group_id": "g42",
+      "group_label": "見 vs 貝 (아래 부품)",
+      "kanji": "貝",
+      "distinguish_ko": "目 아래가 八(두 점)",
+      "meaning_ko": "조개",
+      "reading_key": "かい·バイ",
+      "example_word": "貝",
+      "example_reading": "かい",
+      "example_meaning_ko": "조개"
+    },
+    {
+      "group_id": "g43",
+      "group_label": "母 vs 毎 (머리)",
+      "kanji": "母",
+      "distinguish_ko": "머리 없는 기본자, 점 2개",
+      "meaning_ko": "어머니",
+      "reading_key": "はは·ボ",
+      "example_word": "母",
+      "example_reading": "はは",
+      "example_meaning_ko": "어머니"
+    },
+    {
+      "group_id": "g43",
+      "group_label": "母 vs 毎 (머리)",
+      "kanji": "毎",
+      "distinguish_ko": "母 위에 𠂉(ノ+一) 머리가 얹힘",
+      "meaning_ko": "매번",
+      "reading_key": "マイ·ごと",
+      "example_word": "毎日",
+      "example_reading": "まいにち",
+      "example_meaning_ko": "매일"
+    },
+    {
+      "group_id": "g44",
+      "group_label": "化 vs 花 (초두 유무)",
+      "kanji": "化",
+      "distinguish_ko": "亻+匕만, 머리 없음",
+      "meaning_ko": "되다·변하다",
+      "reading_key": "カ·ケ·ば(ける)",
+      "example_word": "文化",
+      "example_reading": "ぶんか",
+      "example_meaning_ko": "문화"
+    },
+    {
+      "group_id": "g44",
+      "group_label": "化 vs 花 (초두 유무)",
+      "kanji": "花",
+      "distinguish_ko": "化 위에 艹(초두머리)가 있음",
+      "meaning_ko": "꽃",
+      "reading_key": "はな·カ",
+      "example_word": "花",
+      "example_reading": "はな",
+      "example_meaning_ko": "꽃"
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": "聞",
+      "distinguish_ko": "門 안에 耳(귀)",
+      "meaning_ko": "듣다",
+      "reading_key": "き(く)·ブン",
+      "example_word": "聞く",
+      "example_reading": "きく",
+      "example_meaning_ko": "듣다"
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": "開",
+      "distinguish_ko": "門 안에 廾(받쳐든 두 손)",
+      "meaning_ko": "열다",
+      "reading_key": "ひら(く)·あ(ける)·カイ",
+      "example_word": "開ける",
+      "example_reading": "あける",
+      "example_meaning_ko": "열다"
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": "間",
+      "distinguish_ko": "門 안에 日(날)",
+      "meaning_ko": "사이·시간",
+      "reading_key": "あいだ·カン",
+      "example_word": "時間",
+      "example_reading": "じかん",
+      "example_meaning_ko": "시간"
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": "問",
+      "distinguish_ko": "門 안에 口(입)",
+      "meaning_ko": "묻다",
+      "reading_key": "と(う)·モン",
+      "example_word": "問題",
+      "example_reading": "もんだい",
+      "example_meaning_ko": "문제"
+    },
+    {
+      "group_id": "g45",
+      "group_label": "門 안에 무엇이 (聞·開·間·問·閉)",
+      "kanji": "閉",
+      "distinguish_ko": "門 안에 才(빗장)",
+      "meaning_ko": "닫다",
+      "reading_key": "し(める)·と(じる)·ヘイ",
+      "example_word": "閉める",
+      "example_reading": "しめる",
+      "example_meaning_ko": "닫다"
+    },
+    {
+      "group_id": "g46",
+      "group_label": "雨 머리 아래 무엇이 (雪·雲·電)",
+      "kanji": "雪",
+      "distinguish_ko": "雨 아래에 ヨ(빗자루 모양)",
+      "meaning_ko": "눈",
+      "reading_key": "ゆき·セツ",
+      "example_word": "雪",
+      "example_reading": "ゆき",
+      "example_meaning_ko": "눈"
+    },
+    {
+      "group_id": "g46",
+      "group_label": "雨 머리 아래 무엇이 (雪·雲·電)",
+      "kanji": "雲",
+      "distinguish_ko": "雨 아래에 云",
+      "meaning_ko": "구름",
+      "reading_key": "くも·ウン",
+      "example_word": "雲",
+      "example_reading": "くも",
+      "example_meaning_ko": "구름"
+    },
+    {
+      "group_id": "g46",
+      "group_label": "雨 머리 아래 무엇이 (雪·雲·電)",
+      "kanji": "電",
+      "distinguish_ko": "雨 아래에 电(申, 번개)",
+      "meaning_ko": "전기",
+      "reading_key": "デン",
+      "example_word": "電気",
+      "example_reading": "でんき",
+      "example_meaning_ko": "전기"
+    },
+    {
+      "group_id": "g47",
+      "group_label": "左 vs 友 vs 有 (ナ 머리 아래)",
+      "kanji": "左",
+      "distinguish_ko": "ナ 아래가 工(장인 공)",
+      "meaning_ko": "왼쪽",
+      "reading_key": "ひだり·サ",
+      "example_word": "左",
+      "example_reading": "ひだり",
+      "example_meaning_ko": "왼쪽"
+    },
+    {
+      "group_id": "g47",
+      "group_label": "左 vs 友 vs 有 (ナ 머리 아래)",
+      "kanji": "友",
+      "distinguish_ko": "ナ 아래가 又(또 우)",
+      "meaning_ko": "친구",
+      "reading_key": "とも·ユウ",
+      "example_word": "友達",
+      "example_reading": "ともだち",
+      "example_meaning_ko": "친구"
+    },
+    {
+      "group_id": "g47",
+      "group_label": "左 vs 友 vs 有 (ナ 머리 아래)",
+      "kanji": "有",
+      "distinguish_ko": "ナ 아래가 月(달 월)",
+      "meaning_ko": "있다·가지다",
+      "reading_key": "あ(る)·ユウ",
+      "example_word": "有名",
+      "example_reading": "ゆうめい",
+      "example_meaning_ko": "유명"
+    },
+    {
+      "group_id": "g48",
+      "group_label": "名 vs 各 (윗부분)",
+      "kanji": "名",
+      "distinguish_ko": "위가 夕(저녁 석) + 아래 口",
+      "meaning_ko": "이름",
+      "reading_key": "な·メイ",
+      "example_word": "名前",
+      "example_reading": "なまえ",
+      "example_meaning_ko": "이름"
+    },
+    {
+      "group_id": "g48",
+      "group_label": "名 vs 各 (윗부분)",
+      "kanji": "各",
+      "distinguish_ko": "위가 夂(뒤져올 치) + 아래 口",
+      "meaning_ko": "각각",
+      "reading_key": "おのおの·カク",
+      "example_word": "各自",
+      "example_reading": "かくじ",
+      "example_meaning_ko": "각자"
     }
   ]
 }
