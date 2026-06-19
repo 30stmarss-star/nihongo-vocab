@@ -1,5 +1,5 @@
 import type { Word } from "../data/types";
-import { typeLabel } from "../data/types";
+import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
 
 /** 단어를 꾹 누르고 있는 동안 떠 있는 상세 카드. 손/마우스를 떼면 사라진다. */
@@ -9,6 +9,8 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
   const examples = Array.isArray(word.examples) ? word.examples : [];
   // 일본 신자체(약식)면 한국식 정자 병기
   const tradWord = tradForm(word.kanji);
+  // 후행 결합형(예: ~ながら)이면 표제어·독음 앞에 ~
+  const pre = boundPrefix(word);
 
   // 화면 밖으로 나가지 않도록 대략적으로 보정
   const W = 320;
@@ -24,14 +26,14 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
     >
       <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4 shadow-2xl shadow-black/60 ring-1 ring-black/40">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold text-white">{word.kanji}</span>
+          <span className="text-2xl font-semibold text-white">{pre}{word.kanji}</span>
           {tradWord && (
             <span className="text-base text-amber-300/90" title="한국식 정자">
               ({tradWord})
             </span>
           )}
           {word.kanji !== word.kana && (
-            <span className="text-sm text-neutral-400">{word.kana}</span>
+            <span className="text-sm text-neutral-400">{pre}{word.kana}</span>
           )}
           <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-xs text-neutral-300">
             {word.level} · {typeLabel(word.type)}

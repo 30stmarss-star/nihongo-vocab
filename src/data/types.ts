@@ -43,6 +43,20 @@ export interface Word {
   freq?: number; // 중요도/빈도 등급 1=핵심(가장 먼저) 2=보통 3=덜 중요 (없으면 2로 취급)
 }
 
+/**
+ * 앞에 다른 말이 와야 쓰는 '후행 결합' 표현인지 판별.
+ * 한국어 뜻이 물결표(~)로 시작하도록 데이터가 정리돼 있어(예: "~하면서", "~에 관해서"),
+ * 이를 신호로 삼는다. → 로컬/DB/미래 단어에 자동 적용.
+ */
+export function isBoundForm(w: Word): boolean {
+  return w.meaning.trimStart().startsWith("~");
+}
+
+/** 후행 결합형이면 일본어 표제어·독음 앞에 붙일 "~", 아니면 "". */
+export function boundPrefix(w: Word): string {
+  return isBoundForm(w) ? "~" : "";
+}
+
 /** 표 "활용/품사" 열에 표시할 짧은 라벨 */
 export function typeLabel(t: WordType): string {
   switch (t.kind) {

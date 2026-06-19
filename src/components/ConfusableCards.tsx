@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
-import { CONFUSABLE_GROUPS, type ConfusableGroup, type ConfusableKanji } from "../data/confusables";
+import { CONFUSABLE_GROUPS, KANJI_KO, type ConfusableGroup, type ConfusableKanji } from "../data/confusables";
 import { loadConfusableMemorized, persistConfusableMemorized } from "../lib/store";
 
 /**
@@ -156,9 +156,12 @@ function GroupCard({
 function KanjiEntry({ k, revealed }: { k: ConfusableKanji; revealed: boolean }) {
   return (
     <li className="flex items-stretch gap-3 px-4 py-3">
-      {/* 한자: 항상 보임 */}
-      <div className="flex w-[56px] shrink-0 items-center justify-center">
+      {/* 한자 + 한국어 훈음(예: 흙 토): 항상 보임 */}
+      <div className="flex w-[60px] shrink-0 flex-col items-center justify-center gap-1">
         <span className="text-4xl leading-none text-white">{k.kanji}</span>
+        {KANJI_KO[k.kanji] && (
+          <span className="text-[10px] leading-none text-neutral-400">{KANJI_KO[k.kanji]}</span>
+        )}
       </div>
 
       <div className="min-w-0 flex-1">

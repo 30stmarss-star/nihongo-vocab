@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import type { Word } from "../data/types";
+import { boundPrefix } from "../data/types";
 import type { Progress } from "../lib/srs";
 
 /**
@@ -60,10 +61,15 @@ function WordRow({
   const known = !!p && p.seenCount > 0 && p.mastery >= 1;
   const ko = mode === "ko";
 
+  // 후행 결합형(예: ~ながら)이면 일본어 표제어·독음 앞에 ~를 붙인다.
+  const pre = boundPrefix(word);
+  const jpKanji = pre + word.kanji;
+  const jpKana = pre + word.kana;
+
   // 보이는 칸(왼쪽)과 가려진 칸(오른쪽)을 모드에 따라 바꾼다.
-  const promptText = ko ? word.meaning : word.kanji;
-  const maskedLeft = ko ? word.kanji : word.kana; // 가려진 첫 칸
-  const maskedRight = ko ? word.kana : word.meaning; // 가려진 둘째 칸
+  const promptText = ko ? word.meaning : jpKanji;
+  const maskedLeft = ko ? jpKanji : jpKana; // 가려진 첫 칸
+  const maskedRight = ko ? jpKana : word.meaning; // 가려진 둘째 칸
 
   function toggle() {
     if (known) {
