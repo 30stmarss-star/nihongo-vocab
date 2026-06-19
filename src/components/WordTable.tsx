@@ -79,7 +79,7 @@ function WordRow({
   return (
     <li
       className={[
-        "relative flex items-stretch px-3 py-1 transition-colors",
+        "relative flex min-h-[3.25rem] items-stretch px-3 py-1.5 transition-colors",
         "border-b border-white/5 last:border-0",
         known ? "bg-emerald-500/[0.07]" : "",
         flash ? "bg-emerald-500/15" : "",
@@ -89,7 +89,7 @@ function WordRow({
       <button
         type="button"
         className={[
-          "no-select flex shrink-0 cursor-pointer items-center py-2 text-left text-white",
+          "no-select flex shrink-0 cursor-pointer items-center py-2.5 text-left text-white",
           ko
             ? "w-[44%] pr-2 text-sm leading-snug sm:text-base [overflow-wrap:anywhere]"
             : "w-[34%] truncate text-base sm:text-lg",
@@ -100,24 +100,22 @@ function WordRow({
         <span className={ko ? "line-clamp-2" : "truncate"}>{promptText}</span>
       </button>
 
-      {/* 정답(가림) 영역: 꾹 누르고 있으면 잠깐 보임.
-          모바일에서 쉽게 눌리도록 세로로 행 전체 높이를 터치 판정으로 사용한다. */}
-      <div
-        className="no-select relative flex flex-1 cursor-pointer items-center py-2"
-        style={{ touchAction: "none" }}
+      {/* 정답(가림) 영역: 탭하면 토글로 드러남(다시 탭하면 가림).
+          꾹 누르기와 달리 손가락이 글자를 덮지 않고, 행 전체 높이가 터치 판정이라 굵은 손가락도 쉽다. */}
+      <button
+        type="button"
+        aria-pressed={revealed}
+        aria-label={revealed ? "정답 가리기" : "정답 보기"}
+        className="no-select relative flex flex-1 cursor-pointer items-center py-2.5 text-left"
+        style={{ touchAction: "manipulation" }}
         onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-          setRevealed(true);
-        }}
-        onPointerUp={() => setRevealed(false)}
-        onPointerCancel={() => setRevealed(false)}
+        onClick={() => setRevealed((v) => !v)}
       >
         <div className="grid w-full grid-cols-2 gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
-      </div>
+      </button>
 
       {/* 암기 체크 (토글) */}
       <div className="no-select flex w-[56px] shrink-0 items-center justify-center">
@@ -174,7 +172,7 @@ function MaskedCell({
       <span
         aria-hidden
         className={[
-          "absolute inset-y-1 left-0 right-0 rounded-[2px]",
+          "absolute inset-y-0 left-0 right-0 rounded-md",
           "bg-white/15",
           "transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",

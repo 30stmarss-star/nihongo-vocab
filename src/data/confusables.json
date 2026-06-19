@@ -1,0 +1,746 @@
+{
+  "title": "닮은꼴 한자 스타터 세트 (초급/N5-N4)",
+  "note": "능동 회상은 example_word(한자)를 보여주고 reading/meaning을 가린 채 '한자 → 읽기' 방향으로. distinguish_ko는 카드 뒷면 힌트로.",
+  "groups": [
+    {
+      "group_id": "g01",
+      "group_label": "休 vs 体",
+      "kanji": [
+        {
+          "kanji": "休",
+          "distinguish_ko": "오른쪽이 木(나무)",
+          "meaning_ko": "쉬다",
+          "reading_key": "やす(む)·キュウ",
+          "example": {
+            "word": "休む",
+            "reading": "やすむ",
+            "meaning_ko": "쉬다"
+          }
+        },
+        {
+          "kanji": "体",
+          "distinguish_ko": "오른쪽이 本(木+아래 가로획)",
+          "meaning_ko": "몸",
+          "reading_key": "からだ·タイ",
+          "example": {
+            "word": "体",
+            "reading": "からだ",
+            "meaning_ko": "몸"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g02",
+      "group_label": "待 vs 特",
+      "kanji": [
+        {
+          "kanji": "待",
+          "distinguish_ko": "왼쪽이 彳(두인변, 行의 왼쪽)",
+          "meaning_ko": "기다리다",
+          "reading_key": "ま(つ)·タイ",
+          "example": {
+            "word": "待つ",
+            "reading": "まつ",
+            "meaning_ko": "기다리다"
+          }
+        },
+        {
+          "kanji": "特",
+          "distinguish_ko": "왼쪽이 牛(소 우)",
+          "meaning_ko": "특별하다",
+          "reading_key": "トク",
+          "example": {
+            "word": "特別",
+            "reading": "とくべつ",
+            "meaning_ko": "특별"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g03",
+      "group_label": "末 vs 未",
+      "kanji": [
+        {
+          "kanji": "末",
+          "distinguish_ko": "위 가로획이 더 긺 (끝=위가 길다)",
+          "meaning_ko": "끝",
+          "reading_key": "すえ·マツ",
+          "example": {
+            "word": "週末",
+            "reading": "しゅうまつ",
+            "meaning_ko": "주말"
+          }
+        },
+        {
+          "kanji": "未",
+          "distinguish_ko": "위 가로획이 더 짧음 (아직 덜 자람)",
+          "meaning_ko": "아직 ~않다",
+          "reading_key": "ミ",
+          "example": {
+            "word": "未来",
+            "reading": "みらい",
+            "meaning_ko": "미래"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g04",
+      "group_label": "土 vs 士",
+      "kanji": [
+        {
+          "kanji": "土",
+          "distinguish_ko": "아래 가로획이 더 긺 (땅은 아래가 넓다)",
+          "meaning_ko": "흙·땅",
+          "reading_key": "つち·ド",
+          "example": {
+            "word": "土曜日",
+            "reading": "どようび",
+            "meaning_ko": "토요일"
+          }
+        },
+        {
+          "kanji": "士",
+          "distinguish_ko": "위 가로획이 더 긺",
+          "meaning_ko": "선비·~사(士)",
+          "reading_key": "シ",
+          "example": {
+            "word": "博士",
+            "reading": "はかせ",
+            "meaning_ko": "박사"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g05",
+      "group_label": "人 vs 入",
+      "kanji": [
+        {
+          "kanji": "人",
+          "distinguish_ko": "두 획이 꼭대기에서 한 점으로 딱 만남",
+          "meaning_ko": "사람",
+          "reading_key": "ひと·ジン/ニン",
+          "example": {
+            "word": "人",
+            "reading": "ひと",
+            "meaning_ko": "사람"
+          }
+        },
+        {
+          "kanji": "入",
+          "distinguish_ko": "위쪽이 어긋나 한 획이 삐져나옴",
+          "meaning_ko": "들다·넣다",
+          "reading_key": "はい(る)/い(れる)·ニュウ",
+          "example": {
+            "word": "入る",
+            "reading": "はいる",
+            "meaning_ko": "들어가다"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g06",
+      "group_label": "大 vs 犬 vs 太",
+      "kanji": [
+        {
+          "kanji": "大",
+          "distinguish_ko": "점 없음",
+          "meaning_ko": "크다",
+          "reading_key": "おお(きい)·ダイ/タイ",
+          "example": {
+            "word": "大きい",
+            "reading": "おおきい",
+            "meaning_ko": "크다"
+          }
+        },
+        {
+          "kanji": "犬",
+          "distinguish_ko": "오른쪽 위에 점",
+          "meaning_ko": "개",
+          "reading_key": "いぬ·ケン",
+          "example": {
+            "word": "犬",
+            "reading": "いぬ",
+            "meaning_ko": "개"
+          }
+        },
+        {
+          "kanji": "太",
+          "distinguish_ko": "가운데 아래에 점",
+          "meaning_ko": "굵다·뚱뚱하다",
+          "reading_key": "ふと(い)·タイ",
+          "example": {
+            "word": "太陽",
+            "reading": "たいよう",
+            "meaning_ko": "태양"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g07",
+      "group_label": "木 vs 本",
+      "kanji": [
+        {
+          "kanji": "木",
+          "distinguish_ko": "기본형(나무)",
+          "meaning_ko": "나무",
+          "reading_key": "き·モク/ボク",
+          "example": {
+            "word": "木曜日",
+            "reading": "もくようび",
+            "meaning_ko": "목요일"
+          }
+        },
+        {
+          "kanji": "本",
+          "distinguish_ko": "아래에 가로획 하나 추가",
+          "meaning_ko": "책·근본",
+          "reading_key": "ほん·ホン",
+          "example": {
+            "word": "本",
+            "reading": "ほん",
+            "meaning_ko": "책"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g08",
+      "group_label": "日 vs 目",
+      "kanji": [
+        {
+          "kanji": "日",
+          "distinguish_ko": "안에 가로획 1개",
+          "meaning_ko": "날·해",
+          "reading_key": "ひ·ニチ/ジツ",
+          "example": {
+            "word": "日",
+            "reading": "ひ",
+            "meaning_ko": "날·해"
+          }
+        },
+        {
+          "kanji": "目",
+          "distinguish_ko": "안에 가로획 2개",
+          "meaning_ko": "눈",
+          "reading_key": "め·モク",
+          "example": {
+            "word": "目",
+            "reading": "め",
+            "meaning_ko": "눈"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g09",
+      "group_label": "白 vs 百 vs 自",
+      "kanji": [
+        {
+          "kanji": "白",
+          "distinguish_ko": "기본형",
+          "meaning_ko": "희다·흰색",
+          "reading_key": "しろ·ハク/ビャク",
+          "example": {
+            "word": "白い",
+            "reading": "しろい",
+            "meaning_ko": "희다"
+          }
+        },
+        {
+          "kanji": "百",
+          "distinguish_ko": "위에 가로획 하나 추가",
+          "meaning_ko": "백(100)",
+          "reading_key": "ひゃく",
+          "example": {
+            "word": "百",
+            "reading": "ひゃく",
+            "meaning_ko": "백(100)"
+          }
+        },
+        {
+          "kanji": "自",
+          "distinguish_ko": "위 왼쪽에 짧은 삐침(ノ) 추가",
+          "meaning_ko": "스스로·자기",
+          "reading_key": "みずか(ら)·ジ/シ",
+          "example": {
+            "word": "自分",
+            "reading": "じぶん",
+            "meaning_ko": "자기·자신"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g10",
+      "group_label": "王 vs 玉",
+      "kanji": [
+        {
+          "kanji": "王",
+          "distinguish_ko": "점 없음",
+          "meaning_ko": "왕",
+          "reading_key": "オウ",
+          "example": {
+            "word": "王",
+            "reading": "おう",
+            "meaning_ko": "왕"
+          }
+        },
+        {
+          "kanji": "玉",
+          "distinguish_ko": "점 하나 추가",
+          "meaning_ko": "구슬",
+          "reading_key": "たま·ギョク",
+          "example": {
+            "word": "玉",
+            "reading": "たま",
+            "meaning_ko": "구슬"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g11",
+      "group_label": "力 vs 刀",
+      "kanji": [
+        {
+          "kanji": "力",
+          "distinguish_ko": "위 왼쪽으로 삐침이 뻗어나옴",
+          "meaning_ko": "힘",
+          "reading_key": "ちから·リョク/リキ",
+          "example": {
+            "word": "力",
+            "reading": "ちから",
+            "meaning_ko": "힘"
+          }
+        },
+        {
+          "kanji": "刀",
+          "distinguish_ko": "위가 막혀 삐침 없음",
+          "meaning_ko": "칼",
+          "reading_key": "かたな·トウ",
+          "example": {
+            "word": "刀",
+            "reading": "かたな",
+            "meaning_ko": "칼"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g12",
+      "group_label": "田 vs 由 vs 甲 vs 申 (세로획이 어디로 나오나)",
+      "kanji": [
+        {
+          "kanji": "田",
+          "distinguish_ko": "세로획이 밖으로 안 나옴 (갇힘)",
+          "meaning_ko": "밭",
+          "reading_key": "た·デン",
+          "example": {
+            "word": "田中",
+            "reading": "たなか",
+            "meaning_ko": "다나카(성씨)"
+          }
+        },
+        {
+          "kanji": "由",
+          "distinguish_ko": "세로획이 위로만 나옴",
+          "meaning_ko": "말미암다·이유",
+          "reading_key": "ユ/ユウ·よし",
+          "example": {
+            "word": "理由",
+            "reading": "りゆう",
+            "meaning_ko": "이유"
+          }
+        },
+        {
+          "kanji": "甲",
+          "distinguish_ko": "세로획이 아래로만 나옴",
+          "meaning_ko": "갑옷·첫째",
+          "reading_key": "コウ/カン",
+          "example": {
+            "word": "甲",
+            "reading": "こう",
+            "meaning_ko": "갑(첫째)"
+          }
+        },
+        {
+          "kanji": "申",
+          "distinguish_ko": "세로획이 위아래 양쪽으로 나옴",
+          "meaning_ko": "말씀드리다·아뢰다",
+          "reading_key": "もう(す)·シン",
+          "example": {
+            "word": "申し込む",
+            "reading": "もうしこむ",
+            "meaning_ko": "신청하다"
+          }
+        }
+      ]
+    },
+    {
+      "group_id": "g13",
+      "group_label": "千 vs 干",
+      "kanji": [
+        {
+          "kanji": "千",
+          "distinguish_ko": "맨 위가 삐침(ノ)",
+          "meaning_ko": "천(1000)",
+          "reading_key": "セン·ち",
+          "example": {
+            "word": "千",
+            "reading": "せん",
+            "meaning_ko": "천(1000)"
+          }
+        },
+        {
+          "kanji": "干",
+          "distinguish_ko": "맨 위가 평평한 가로획",
+          "meaning_ko": "마르다·방패",
+          "reading_key": "カン·ほ(す)",
+          "example": {
+            "word": "干す",
+            "reading": "ほす",
+            "meaning_ko": "말리다"
+          }
+        }
+      ]
+    }
+  ],
+  "cards_flat": [
+    {
+      "group_id": "g01",
+      "group_label": "休 vs 体",
+      "kanji": "休",
+      "distinguish_ko": "오른쪽이 木(나무)",
+      "meaning_ko": "쉬다",
+      "reading_key": "やす(む)·キュウ",
+      "example_word": "休む",
+      "example_reading": "やすむ",
+      "example_meaning_ko": "쉬다"
+    },
+    {
+      "group_id": "g01",
+      "group_label": "休 vs 体",
+      "kanji": "体",
+      "distinguish_ko": "오른쪽이 本(木+아래 가로획)",
+      "meaning_ko": "몸",
+      "reading_key": "からだ·タイ",
+      "example_word": "体",
+      "example_reading": "からだ",
+      "example_meaning_ko": "몸"
+    },
+    {
+      "group_id": "g02",
+      "group_label": "待 vs 特",
+      "kanji": "待",
+      "distinguish_ko": "왼쪽이 彳(두인변, 行의 왼쪽)",
+      "meaning_ko": "기다리다",
+      "reading_key": "ま(つ)·タイ",
+      "example_word": "待つ",
+      "example_reading": "まつ",
+      "example_meaning_ko": "기다리다"
+    },
+    {
+      "group_id": "g02",
+      "group_label": "待 vs 特",
+      "kanji": "特",
+      "distinguish_ko": "왼쪽이 牛(소 우)",
+      "meaning_ko": "특별하다",
+      "reading_key": "トク",
+      "example_word": "特別",
+      "example_reading": "とくべつ",
+      "example_meaning_ko": "특별"
+    },
+    {
+      "group_id": "g03",
+      "group_label": "末 vs 未",
+      "kanji": "末",
+      "distinguish_ko": "위 가로획이 더 긺 (끝=위가 길다)",
+      "meaning_ko": "끝",
+      "reading_key": "すえ·マツ",
+      "example_word": "週末",
+      "example_reading": "しゅうまつ",
+      "example_meaning_ko": "주말"
+    },
+    {
+      "group_id": "g03",
+      "group_label": "末 vs 未",
+      "kanji": "未",
+      "distinguish_ko": "위 가로획이 더 짧음 (아직 덜 자람)",
+      "meaning_ko": "아직 ~않다",
+      "reading_key": "ミ",
+      "example_word": "未来",
+      "example_reading": "みらい",
+      "example_meaning_ko": "미래"
+    },
+    {
+      "group_id": "g04",
+      "group_label": "土 vs 士",
+      "kanji": "土",
+      "distinguish_ko": "아래 가로획이 더 긺 (땅은 아래가 넓다)",
+      "meaning_ko": "흙·땅",
+      "reading_key": "つち·ド",
+      "example_word": "土曜日",
+      "example_reading": "どようび",
+      "example_meaning_ko": "토요일"
+    },
+    {
+      "group_id": "g04",
+      "group_label": "土 vs 士",
+      "kanji": "士",
+      "distinguish_ko": "위 가로획이 더 긺",
+      "meaning_ko": "선비·~사(士)",
+      "reading_key": "シ",
+      "example_word": "博士",
+      "example_reading": "はかせ",
+      "example_meaning_ko": "박사"
+    },
+    {
+      "group_id": "g05",
+      "group_label": "人 vs 入",
+      "kanji": "人",
+      "distinguish_ko": "두 획이 꼭대기에서 한 점으로 딱 만남",
+      "meaning_ko": "사람",
+      "reading_key": "ひと·ジン/ニン",
+      "example_word": "人",
+      "example_reading": "ひと",
+      "example_meaning_ko": "사람"
+    },
+    {
+      "group_id": "g05",
+      "group_label": "人 vs 入",
+      "kanji": "入",
+      "distinguish_ko": "위쪽이 어긋나 한 획이 삐져나옴",
+      "meaning_ko": "들다·넣다",
+      "reading_key": "はい(る)/い(れる)·ニュウ",
+      "example_word": "入る",
+      "example_reading": "はいる",
+      "example_meaning_ko": "들어가다"
+    },
+    {
+      "group_id": "g06",
+      "group_label": "大 vs 犬 vs 太",
+      "kanji": "大",
+      "distinguish_ko": "점 없음",
+      "meaning_ko": "크다",
+      "reading_key": "おお(きい)·ダイ/タイ",
+      "example_word": "大きい",
+      "example_reading": "おおきい",
+      "example_meaning_ko": "크다"
+    },
+    {
+      "group_id": "g06",
+      "group_label": "大 vs 犬 vs 太",
+      "kanji": "犬",
+      "distinguish_ko": "오른쪽 위에 점",
+      "meaning_ko": "개",
+      "reading_key": "いぬ·ケン",
+      "example_word": "犬",
+      "example_reading": "いぬ",
+      "example_meaning_ko": "개"
+    },
+    {
+      "group_id": "g06",
+      "group_label": "大 vs 犬 vs 太",
+      "kanji": "太",
+      "distinguish_ko": "가운데 아래에 점",
+      "meaning_ko": "굵다·뚱뚱하다",
+      "reading_key": "ふと(い)·タイ",
+      "example_word": "太陽",
+      "example_reading": "たいよう",
+      "example_meaning_ko": "태양"
+    },
+    {
+      "group_id": "g07",
+      "group_label": "木 vs 本",
+      "kanji": "木",
+      "distinguish_ko": "기본형(나무)",
+      "meaning_ko": "나무",
+      "reading_key": "き·モク/ボク",
+      "example_word": "木曜日",
+      "example_reading": "もくようび",
+      "example_meaning_ko": "목요일"
+    },
+    {
+      "group_id": "g07",
+      "group_label": "木 vs 本",
+      "kanji": "本",
+      "distinguish_ko": "아래에 가로획 하나 추가",
+      "meaning_ko": "책·근본",
+      "reading_key": "ほん·ホン",
+      "example_word": "本",
+      "example_reading": "ほん",
+      "example_meaning_ko": "책"
+    },
+    {
+      "group_id": "g08",
+      "group_label": "日 vs 目",
+      "kanji": "日",
+      "distinguish_ko": "안에 가로획 1개",
+      "meaning_ko": "날·해",
+      "reading_key": "ひ·ニチ/ジツ",
+      "example_word": "日",
+      "example_reading": "ひ",
+      "example_meaning_ko": "날·해"
+    },
+    {
+      "group_id": "g08",
+      "group_label": "日 vs 目",
+      "kanji": "目",
+      "distinguish_ko": "안에 가로획 2개",
+      "meaning_ko": "눈",
+      "reading_key": "め·モク",
+      "example_word": "目",
+      "example_reading": "め",
+      "example_meaning_ko": "눈"
+    },
+    {
+      "group_id": "g09",
+      "group_label": "白 vs 百 vs 自",
+      "kanji": "白",
+      "distinguish_ko": "기본형",
+      "meaning_ko": "희다·흰색",
+      "reading_key": "しろ·ハク/ビャク",
+      "example_word": "白い",
+      "example_reading": "しろい",
+      "example_meaning_ko": "희다"
+    },
+    {
+      "group_id": "g09",
+      "group_label": "白 vs 百 vs 自",
+      "kanji": "百",
+      "distinguish_ko": "위에 가로획 하나 추가",
+      "meaning_ko": "백(100)",
+      "reading_key": "ひゃく",
+      "example_word": "百",
+      "example_reading": "ひゃく",
+      "example_meaning_ko": "백(100)"
+    },
+    {
+      "group_id": "g09",
+      "group_label": "白 vs 百 vs 自",
+      "kanji": "自",
+      "distinguish_ko": "위 왼쪽에 짧은 삐침(ノ) 추가",
+      "meaning_ko": "스스로·자기",
+      "reading_key": "みずか(ら)·ジ/シ",
+      "example_word": "自分",
+      "example_reading": "じぶん",
+      "example_meaning_ko": "자기·자신"
+    },
+    {
+      "group_id": "g10",
+      "group_label": "王 vs 玉",
+      "kanji": "王",
+      "distinguish_ko": "점 없음",
+      "meaning_ko": "왕",
+      "reading_key": "オウ",
+      "example_word": "王",
+      "example_reading": "おう",
+      "example_meaning_ko": "왕"
+    },
+    {
+      "group_id": "g10",
+      "group_label": "王 vs 玉",
+      "kanji": "玉",
+      "distinguish_ko": "점 하나 추가",
+      "meaning_ko": "구슬",
+      "reading_key": "たま·ギョク",
+      "example_word": "玉",
+      "example_reading": "たま",
+      "example_meaning_ko": "구슬"
+    },
+    {
+      "group_id": "g11",
+      "group_label": "力 vs 刀",
+      "kanji": "力",
+      "distinguish_ko": "위 왼쪽으로 삐침이 뻗어나옴",
+      "meaning_ko": "힘",
+      "reading_key": "ちから·リョク/リキ",
+      "example_word": "力",
+      "example_reading": "ちから",
+      "example_meaning_ko": "힘"
+    },
+    {
+      "group_id": "g11",
+      "group_label": "力 vs 刀",
+      "kanji": "刀",
+      "distinguish_ko": "위가 막혀 삐침 없음",
+      "meaning_ko": "칼",
+      "reading_key": "かたな·トウ",
+      "example_word": "刀",
+      "example_reading": "かたな",
+      "example_meaning_ko": "칼"
+    },
+    {
+      "group_id": "g12",
+      "group_label": "田 vs 由 vs 甲 vs 申 (세로획이 어디로 나오나)",
+      "kanji": "田",
+      "distinguish_ko": "세로획이 밖으로 안 나옴 (갇힘)",
+      "meaning_ko": "밭",
+      "reading_key": "た·デン",
+      "example_word": "田中",
+      "example_reading": "たなか",
+      "example_meaning_ko": "다나카(성씨)"
+    },
+    {
+      "group_id": "g12",
+      "group_label": "田 vs 由 vs 甲 vs 申 (세로획이 어디로 나오나)",
+      "kanji": "由",
+      "distinguish_ko": "세로획이 위로만 나옴",
+      "meaning_ko": "말미암다·이유",
+      "reading_key": "ユ/ユウ·よし",
+      "example_word": "理由",
+      "example_reading": "りゆう",
+      "example_meaning_ko": "이유"
+    },
+    {
+      "group_id": "g12",
+      "group_label": "田 vs 由 vs 甲 vs 申 (세로획이 어디로 나오나)",
+      "kanji": "甲",
+      "distinguish_ko": "세로획이 아래로만 나옴",
+      "meaning_ko": "갑옷·첫째",
+      "reading_key": "コウ/カン",
+      "example_word": "甲",
+      "example_reading": "こう",
+      "example_meaning_ko": "갑(첫째)"
+    },
+    {
+      "group_id": "g12",
+      "group_label": "田 vs 由 vs 甲 vs 申 (세로획이 어디로 나오나)",
+      "kanji": "申",
+      "distinguish_ko": "세로획이 위아래 양쪽으로 나옴",
+      "meaning_ko": "말씀드리다·아뢰다",
+      "reading_key": "もう(す)·シン",
+      "example_word": "申し込む",
+      "example_reading": "もうしこむ",
+      "example_meaning_ko": "신청하다"
+    },
+    {
+      "group_id": "g13",
+      "group_label": "千 vs 干",
+      "kanji": "千",
+      "distinguish_ko": "맨 위가 삐침(ノ)",
+      "meaning_ko": "천(1000)",
+      "reading_key": "セン·ち",
+      "example_word": "千",
+      "example_reading": "せん",
+      "example_meaning_ko": "천(1000)"
+    },
+    {
+      "group_id": "g13",
+      "group_label": "千 vs 干",
+      "kanji": "干",
+      "distinguish_ko": "맨 위가 평평한 가로획",
+      "meaning_ko": "마르다·방패",
+      "reading_key": "カン·ほ(す)",
+      "example_word": "干す",
+      "example_reading": "ほす",
+      "example_meaning_ko": "말리다"
+    }
+  ]
+}

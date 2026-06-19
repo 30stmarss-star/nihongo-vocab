@@ -20,11 +20,12 @@ import { WordTable } from "./components/WordTable";
 import { WordCard } from "./components/WordCard";
 import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
+import { ConfusableCards } from "./components/ConfusableCards";
 import { SetPassword } from "./components/SetPassword";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
-type View = "study" | "learned" | "tutor";
+type View = "study" | "learned" | "kanji" | "tutor";
 type Phase = "loading" | "login" | "ready";
 
 export default function App() {
@@ -238,6 +239,16 @@ export default function App() {
         >
           외운 단어 {learnedWords.length}
         </button>
+        <button
+          onClick={() => setView("kanji")}
+          className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+            view === "kanji"
+              ? "bg-neutral-700 text-white"
+              : "text-neutral-400 hover:text-neutral-200"
+          }`}
+        >
+          닮은꼴
+        </button>
         {CLOUD && userId && (
           <button
             onClick={() => setView("tutor")}
@@ -254,12 +265,14 @@ export default function App() {
 
       {view === "tutor" ? (
         <Chat />
+      ) : view === "kanji" ? (
+        <ConfusableCards />
       ) : view === "study" ? (
         <>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
-              오른쪽 칸을 <b className="text-neutral-300">꾹 누르면</b> 정답이 잠깐
-              보이고, 왼쪽 <b className="text-neutral-300">단어를 누르면</b> 상세 카드가 떠요(다시 누르면 닫힘).
+              오른쪽 칸을 <b className="text-neutral-300">누르면</b> 정답이
+              보이고(다시 누르면 가림), 왼쪽 <b className="text-neutral-300">단어를 누르면</b> 상세 카드가 떠요(다시 누르면 닫힘).
             </p>
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <select
@@ -305,7 +318,7 @@ export default function App() {
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
               {learnedReverse
-                ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
+                ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 누르면 정답이 보여요(다시 누르면 가림)."
                 : "지금까지 외운 단어예요. ✓ 를 다시 누르면 목록에서 빠져요."}
             </p>
             <button
