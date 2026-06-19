@@ -32,25 +32,39 @@ export function saveBand(band: Band): void {
   localStorage.setItem(BAND_KEY, band);
 }
 
-// ── 닮은꼴 한자: 외운 묶음(group_id) 목록 ──
-// 클라우드 progress 테이블은 words 외래키에 묶여 있어 닮은꼴 그룹을 못 넣는다.
-// 그래서 닮은꼴은 기기별 localStorage(유저 구분 키)로만 보관한다.
+// ── 닮은꼴 한자: 외운 묶음(group_id) 로컬 미러 ──
+// 클라우드 confusable_progress 테이블과 동기화하기 위한 로컬 캐시.
+// 묶음별 { m: 외움여부, t: 마지막 편집시각(ms) } 으로 두어 여러 기기 병합 시
+// updated_at(=t) 기준 마지막 편집이 이기도록 한다.
+export interface ConfusableMark {
+  m: boolean;
+  t: number;
+}
+export type ConfusableMarks = Record<string, ConfusableMark>;
+
 const confusableKey = (uid: string | null) =>
   `nihongo.confusable.memorized.${uid ?? "local"}`;
 
-export function loadConfusableMemorized(uid: string | null): string[] {
+export function loadConfusableMarks(uid: string | null): ConfusableMarks {
   try {
     const raw = localStorage.getItem(confusableKey(uid));
-    const arr = raw ? (JSON.parse(raw) as unknown) : [];
-    return Array.isArray(arr) ? (arr as string[]) : [];
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as unknown;
+    // 구버전(string[]) 호환: 전부 외움=true, 시각=0 으로 본다.
+    if (Array.isArray(parsed)) {
+      const out: ConfusableMarks = {};
+      for (const id of parsed) out[String(id)] = { m: true, t: 0 };
+      return out;
+    }
+    return parsed && typeof parsed === "object" ? (parsed as ConfusableMarks) : {};
   } catch {
-    return [];
+    return {};
   }
 }
 
-export function saveConfusableMemorized(uid: string | null, ids: string[]): void {
+export function saveConfusableMarks(uid: string | null, marks: ConfusableMarks): void {
   try {
-    localStorage.setItem(confusableKey(uid), JSON.stringify(ids));
+    localStorage.setItem(confusableKey(uid), JSON.stringify(marks));
   } catch {
     /* 저장 실패는 조용히 무시 */
   }

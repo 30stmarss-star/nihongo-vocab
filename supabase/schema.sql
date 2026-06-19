@@ -58,6 +58,23 @@ drop policy if exists "own progress" on public.progress;
 create policy "own progress" on public.progress
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- ─────────── 닮은꼴 한자: 외운 묶음(기기 간 동기화) ───────────
+-- group_id는 정적 JSON(confusables.json) 값이라 외래키 없이 text. 행 = 그 묶음의
+-- 외움 상태. updated_at 기준 마지막 편집이 이기도록 해제도 행으로 남긴다(tombstone).
+create table if not exists public.confusable_progress (
+  user_id    uuid not null references auth.users(id) on delete cascade,
+  group_id   text not null,
+  memorized  boolean not null default true,
+  updated_at timestamptz not null default now(),
+  primary key (user_id, group_id)
+);
+
+alter table public.confusable_progress enable row level security;
+
+drop policy if exists "own confusable_progress" on public.confusable_progress;
+create policy "own confusable_progress" on public.confusable_progress
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
 -- 레벨별 단어 수 (Edge Function이 부족분을 판단할 때 사용)
 create or replace function public.word_counts()
 returns table(level text, n bigint)

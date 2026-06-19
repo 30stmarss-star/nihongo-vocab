@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { CONFUSABLE_GROUPS, type ConfusableGroup, type ConfusableKanji } from "../data/confusables";
-import { loadConfusableMemorized, saveConfusableMemorized } from "../lib/storage";
+import { loadConfusableMemorized, persistConfusableMemorized } from "../lib/store";
 
 /**
  * 닮은꼴 한자 비교 카드.
@@ -12,17 +12,24 @@ export function ConfusableCards({ userId }: { userId: string | null }) {
   const [memorized, setMemorized] = useState<Set<string>>(() => new Set());
   const [showMemorized, setShowMemorized] = useState(false);
 
-  // 유저(기기)별 외운 묶음 불러오기
+  // 외운 묶음 불러오기 (클라우드↔로컬 병합). 유저 바뀌면(로그인) 다시 로드.
   useEffect(() => {
-    setMemorized(new Set(loadConfusableMemorized(userId)));
+    let alive = true;
+    void loadConfusableMemorized(userId).then((set) => {
+      if (alive) setMemorized(set);
+    });
+    return () => {
+      alive = false;
+    };
   }, [userId]);
 
   function toggleMemorized(groupId: string) {
     setMemorized((prev) => {
       const next = new Set(prev);
-      if (next.has(groupId)) next.delete(groupId);
-      else next.add(groupId);
-      saveConfusableMemorized(userId, [...next]);
+      const nowMemorized = !next.has(groupId);
+      if (nowMemorized) next.add(groupId);
+      else next.delete(groupId);
+      persistConfusableMemorized(userId, groupId, nowMemorized);
       return next;
     });
   }
