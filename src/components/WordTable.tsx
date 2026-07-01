@@ -1,4 +1,9 @@
-import { useRef, useState } from "react";
+import {
+  useRef,
+  useState,
+  type MouseEvent as ReactMouseEvent,
+  type PointerEvent as ReactPointerEvent,
+} from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
 import type { Progress } from "../lib/srs";
@@ -57,6 +62,34 @@ function WordRow({
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | undefined>(undefined);
 
+  // press-hold 공개: 살짝(110ms) 누르고 있으면 열리고, 그 전에 움직이면(스크롤) 열지 않는다.
+  // → 공개 영역을 넓게 둬도 목록 스크롤이 자연스럽게 유지된다.
+  const revealTimer = useRef<number | undefined>(undefined);
+  const startPt = useRef<{ x: number; y: number } | null>(null);
+  function armReveal(e: ReactPointerEvent) {
+    startPt.current = { x: e.clientX, y: e.clientY };
+    window.clearTimeout(revealTimer.current);
+    revealTimer.current = window.setTimeout(() => setRevealed(true), 110);
+  }
+  function moveReveal(e: ReactPointerEvent) {
+    const s = startPt.current;
+    if (!s) return;
+    if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) disarmReveal();
+  }
+  function disarmReveal() {
+    startPt.current = null;
+    window.clearTimeout(revealTimer.current);
+    setRevealed(false);
+  }
+  const revealHandlers = {
+    onPointerDown: armReveal,
+    onPointerMove: moveReveal,
+    onPointerUp: disarmReveal,
+    onPointerCancel: disarmReveal,
+    onPointerLeave: disarmReveal,
+    onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
+  };
+
   const p = progress[word.id];
   const known = !!p && p.seenCount > 0 && p.mastery >= 1;
   const ko = mode === "ko";
@@ -91,34 +124,36 @@ function WordRow({
         flash ? "bg-emerald-500/15" : "",
       ].join(" ")}
     >
-      {/* 보이는 칸(왼쪽): 누르면 상세 카드 */}
-      <button
-        type="button"
+      {/* 왼쪽 고정폭 칸: '글자' 부분만 누르면 상세 카드가 뜨고,
+          그 오른쪽 빈 공백은 아래 정답 영역과 함께 '꾹 눌러 공개' 영역이 된다. */}
+      <div
         className={[
-          "no-select flex shrink-0 cursor-pointer items-center py-2.5 text-left text-white",
-          ko
-            ? "w-[44%] pr-2 text-sm leading-snug sm:text-base [overflow-wrap:anywhere]"
-            : "w-[34%] truncate text-base sm:text-lg",
+          "no-select relative flex shrink-0 items-stretch",
+          ko ? "w-[44%] pr-2" : "w-[34%]",
         ].join(" ")}
-        onContextMenu={(e) => e.preventDefault()}
-        onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
+        {...revealHandlers}
       >
-        <span className={ko ? "line-clamp-2" : "truncate"}>{promptText}</span>
-      </button>
+        <button
+          type="button"
+          className={[
+            "no-select flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left text-white",
+            ko ? "text-sm leading-snug sm:text-base" : "text-base sm:text-lg",
+          ].join(" ")}
+          onPointerDown={(e) => e.stopPropagation()}
+          onContextMenu={(e) => e.preventDefault()}
+          onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
+        >
+          <span className={ko ? "line-clamp-2 [overflow-wrap:anywhere]" : "truncate"}>
+            {promptText}
+          </span>
+        </button>
+      </div>
 
-      {/* 정답(가림) 영역: 왼쪽 공개 칸을 뺀 '행의 나머지 전체'가 터치 판정.
-          꾹 누르고 있는 동안만 정답이 보인다(굵은 손가락도 어디를 눌러도 열림).
+      {/* 정답(가림) 영역: 꾹 누르고 있는 동안만 정답이 보인다.
           오직 아래 체크 버튼 위에서만 공개 대신 '암기 토글'이 동작한다. */}
       <div
         className="no-select relative flex flex-1 cursor-pointer items-center py-2.5"
-        style={{ touchAction: "none" }}
-        onContextMenu={(e) => e.preventDefault()}
-        onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture?.(e.pointerId);
-          setRevealed(true);
-        }}
-        onPointerUp={() => setRevealed(false)}
-        onPointerCancel={() => setRevealed(false)}
+        {...revealHandlers}
       >
         <div className="grid flex-1 grid-cols-2 gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />

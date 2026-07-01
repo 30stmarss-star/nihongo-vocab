@@ -432,9 +432,6 @@ export default function App() {
       ) : view === "study" ? (
         <>
           <div className="mb-3 flex items-center gap-2">
-            <p className="text-xs text-neutral-500">
-              {studyReverse ? "뜻 → 일본어" : "일본어 → 뜻"}
-            </p>
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <button
                 onClick={() => setStudyReverse((v) => !v)}
