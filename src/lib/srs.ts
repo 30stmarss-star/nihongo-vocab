@@ -145,11 +145,26 @@ export function buildWorksheet(
   progress: ProgressMap,
   count: number,
   now: number,
-  rand: () => number = Math.random
+  rand: () => number = Math.random,
+  priority?: Set<string>
 ): Word[] {
+  // 스캔 등으로 '최우선' 지정된 단어 중 아직 안 외운 것을 학습지 맨 앞에 고정한다.
+  // (외우면 isKnown이 되어 자동으로 빠지고, 학습지 크기를 넘으면 다음 장으로 이월된다.)
+  const front: Word[] = [];
+  if (priority && priority.size) {
+    for (const w of pool) {
+      if (front.length >= count) break;
+      if (priority.has(w.id) && !isKnown(progress[w.id])) front.push(w);
+    }
+  }
+  const frontIds = new Set(front.map((w) => w.id));
+  const rest = count - front.length;
+  if (rest <= 0) return front.slice(0, count);
+
   const introduced: Word[] = [];
   const fresh: Word[] = [];
   for (const w of pool) {
+    if (frontIds.has(w.id)) continue; // 이미 앞에 고정됨
     const p = progress[w.id];
     if (p && p.seenCount > 0) introduced.push(w);
     else fresh.push(w);
@@ -160,19 +175,19 @@ export function buildWorksheet(
   const newCap =
     backlog >= BACKLOG_HARD ? 1 : backlog >= BACKLOG_SOFT ? 3 : NEW_PER_SHEET;
 
-  const newCount = Math.min(newCap, fresh.length, count);
+  const newCount = Math.min(newCap, fresh.length, rest);
   const newPicks = pickByImportance(fresh, newCount, rand);
   const reviewPicks = weightedSample(
     introduced,
     progress,
-    count - newCount,
+    rest - newCount,
     now,
     rand
   );
 
   // 복습 풀이 작아 칸이 남으면(특히 맨 처음: 본 단어가 0개) 새 단어로 마저 채워
   // 학습지를 항상 count만큼 채운다. 복습이 쌓이면 자연히 채울 일이 없어진다.
-  const shortfall = count - newPicks.length - reviewPicks.length;
+  const shortfall = rest - newPicks.length - reviewPicks.length;
   const extraPicks =
     shortfall > 0
       ? pickByImportance(
@@ -182,5 +197,6 @@ export function buildWorksheet(
         )
       : [];
 
-  return shuffle([...newPicks, ...reviewPicks, ...extraPicks], rand);
+  // 스캔 우선 단어(front)는 항상 맨 앞에 두고, 나머지는 섞는다.
+  return [...front, ...shuffle([...newPicks, ...reviewPicks, ...extraPicks], rand)];
 }

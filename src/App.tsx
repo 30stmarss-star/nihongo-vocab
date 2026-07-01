@@ -12,6 +12,7 @@ import {
 import {
   DEFAULT_SIZE,
   loadCachedSession,
+  loadScannedQueue,
   loadSession,
   persistProgress,
   persistSettings,
@@ -22,11 +23,12 @@ import { WordCard } from "./components/WordCard";
 import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
+import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
-type View = "study" | "learned" | "kanji" | "tutor";
+type View = "study" | "learned" | "kanji" | "tutor" | "scan";
 type Phase = "loading" | "login" | "ready";
 
 export default function App() {
@@ -44,6 +46,8 @@ export default function App() {
   // 학습지 뷰 방향: true=한국어→일본어(뜻 보고 단어 떠올리기, 메인 루트), false=일본어→뜻
   const [studyReverse, setStudyReverse] = useState(true);
   const [worksheet, setWorksheet] = useState<Word[]>([]);
+  // 촬영으로 넣은 '최우선' 단어 id 집합 (아직 안 외운 것 → 학습지 맨 앞에 고정)
+  const [scanned, setScanned] = useState<Set<string>>(new Set());
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(
     null
   );
@@ -94,11 +98,15 @@ export default function App() {
     }
 
     // 2) 서버에서 최신 데이터를 받아 백그라운드로 반영한다.
-    const s = await loadSession(uid);
+    const [s, scannedSet] = await Promise.all([
+      loadSession(uid),
+      loadScannedQueue(uid),
+    ]);
     setWords(s.words);
     setSize(s.size);
+    setScanned(scannedSet);
 
-    if (s.band && shownSheet && s.band === shownBand) {
+    if (s.band && shownSheet && s.band === shownBand && scannedSet.size === 0) {
       // 이미 캐시로 보여준 학습지는 유지한다(buildWorksheet가 무작위라 다시 만들면 바뀜).
       // 진행상황만 갱신하고, 보여준 학습지의 '도입' 기록은 보존한다.
       setBand(s.band);
@@ -115,9 +123,9 @@ export default function App() {
       setProgress(next);
       if (changed.length) persistProgress(uid, next, changed);
     } else if (s.band) {
-      // 캐시가 없었거나(첫 방문) 밴드가 달라졌으면 학습지를 새로 만든다.
+      // 캐시가 없었거나(첫 방문) 밴드가 달라졌거나 스캔 우선 단어가 있으면 새로 만든다.
       setBand(s.band);
-      const { sheet, next, changed } = makeSheet(s.band, s.size, s.progress, s.words);
+      const { sheet, next, changed } = makeSheet(s.band, s.size, s.progress, s.words, scannedSet);
       setProgress(next);
       setWorksheet(sheet);
       if (changed.length) persistProgress(uid, next, changed);
@@ -133,9 +141,20 @@ export default function App() {
   }
 
   /** 학습지 생성 + 새로 등장한 단어를 '도입됨'으로 기록 */
-  function makeSheet(b: Band, n: number, prog: ProgressMap, list: Word[]) {
+  function makeSheet(
+    b: Band,
+    n: number,
+    prog: ProgressMap,
+    list: Word[],
+    pri: Set<string> = scanned
+  ) {
     const now = Date.now();
-    const sheet = buildWorksheet(poolFor(b, list), prog, n, now);
+    // 밴드 단어 + 스캔 우선 단어(밴드 밖 레벨이어도 포함)의 합집합을 풀로 사용한다.
+    const bandPool = poolFor(b, list);
+    const inPool = new Set(bandPool.map((w) => w.id));
+    const extra = list.filter((w) => pri.has(w.id) && !inPool.has(w.id));
+    const pool = extra.length ? [...bandPool, ...extra] : bandPool;
+    const sheet = buildWorksheet(pool, prog, n, now, Math.random, pri);
     const next = { ...prog };
     const changed: string[] = [];
     for (const w of sheet) {
@@ -173,6 +192,27 @@ export default function App() {
     setSize(n);
     if (band) persistSettings(userId, band, n);
     regenerate(n);
+  }
+
+  /** 촬영 저장 완료: 단어 풀에 병합 + 우선순위 등록 + 학습지 맨 앞에 반영 후 학습지로 이동 */
+  function onScanSaved(saved: Word[]) {
+    if (!saved.length) return;
+    const byId = new Map(words.map((w) => [w.id, w]));
+    for (const w of saved) byId.set(w.id, w);
+    const merged = [...byId.values()];
+    const nextScanned = new Set(scanned);
+    for (const w of saved) nextScanned.add(w.id);
+    setWords(merged);
+    setScanned(nextScanned);
+    if (band) {
+      const { sheet, next, changed } = makeSheet(band, size, progress, merged, nextScanned);
+      setWorksheet(sheet);
+      if (changed.length) {
+        setProgress(next);
+        persistProgress(userId, next, changed);
+      }
+    }
+    setView("study");
   }
 
   function update(id: string, fn: typeof markKnown) {
@@ -291,6 +331,18 @@ export default function App() {
         </button>
         {CLOUD && userId && (
           <button
+            onClick={() => setView("scan")}
+            className={`flex-1 rounded-lg px-3 py-1.5 transition ${
+              view === "scan"
+                ? "bg-neutral-700 text-white"
+                : "text-neutral-400 hover:text-neutral-200"
+            }`}
+          >
+            촬영 📷
+          </button>
+        )}
+        {CLOUD && userId && (
+          <button
             onClick={() => setView("tutor")}
             className={`flex-1 rounded-lg px-3 py-1.5 transition ${
               view === "tutor"
@@ -303,7 +355,9 @@ export default function App() {
         )}
       </div>
 
-      {view === "tutor" ? (
+      {view === "scan" ? (
+        <ScanCapture onSaved={onScanSaved} />
+      ) : view === "tutor" ? (
         <Chat />
       ) : view === "kanji" ? (
         <ConfusableCards userId={userId} />
