@@ -62,32 +62,31 @@ function WordRow({
   const [flash, setFlash] = useState(false);
   const flashTimer = useRef<number | undefined>(undefined);
 
-  // press-hold 공개: 살짝(110ms) 누르고 있으면 열리고, 그 전에 움직이면(스크롤) 열지 않는다.
-  // → 공개 영역을 넓게 둬도 목록 스크롤이 자연스럽게 유지된다.
-  const revealTimer = useRef<number | undefined>(undefined);
+  // press-hold 공개: 누르는 즉시 열고(타이머 지연 없음 → 아래쪽 행에서도 항상 반응),
+  // 세로로 드래그해 스크롤을 시작하면(움직임 > 12px 또는 브라우저의 pointercancel) 닫는다.
+  // touch-action: pan-y 로 세로 스크롤은 그대로 유지되면서, 제자리로 누르면 안정적으로 열린다.
   const startPt = useRef<{ x: number; y: number } | null>(null);
-  function armReveal(e: ReactPointerEvent) {
+  function revealDown(e: ReactPointerEvent) {
     startPt.current = { x: e.clientX, y: e.clientY };
-    window.clearTimeout(revealTimer.current);
-    revealTimer.current = window.setTimeout(() => setRevealed(true), 110);
+    setRevealed(true);
   }
-  function moveReveal(e: ReactPointerEvent) {
+  function revealMove(e: ReactPointerEvent) {
     const s = startPt.current;
     if (!s) return;
-    if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) disarmReveal();
+    if (Math.abs(e.clientX - s.x) > 12 || Math.abs(e.clientY - s.y) > 12) revealEnd();
   }
-  function disarmReveal() {
+  function revealEnd() {
     startPt.current = null;
-    window.clearTimeout(revealTimer.current);
     setRevealed(false);
   }
   const revealHandlers = {
-    onPointerDown: armReveal,
-    onPointerMove: moveReveal,
-    onPointerUp: disarmReveal,
-    onPointerCancel: disarmReveal,
-    onPointerLeave: disarmReveal,
+    onPointerDown: revealDown,
+    onPointerMove: revealMove,
+    onPointerUp: revealEnd,
+    onPointerCancel: revealEnd,
+    onPointerLeave: revealEnd,
     onContextMenu: (e: ReactMouseEvent) => e.preventDefault(),
+    style: { touchAction: "pan-y" as const },
   };
 
   const p = progress[word.id];
