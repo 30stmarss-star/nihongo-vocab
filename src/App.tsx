@@ -41,6 +41,8 @@ export default function App() {
   const [view, setView] = useState<View>("study");
   // 외운 단어 뷰: false=일본어 보기(뜻 가림), true=뜻 보기(단어·독음 가림, 거꾸로 복습)
   const [learnedReverse, setLearnedReverse] = useState(false);
+  // 학습지 뷰 방향: true=한국어→일본어(뜻 보고 단어 떠올리기, 메인 루트), false=일본어→뜻
+  const [studyReverse, setStudyReverse] = useState(true);
   const [worksheet, setWorksheet] = useState<Word[]>([]);
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(
     null
@@ -309,10 +311,18 @@ export default function App() {
         <>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
-              오른쪽 칸을 <b className="text-neutral-300">꾹 누르면</b> 정답이 잠깐
-              보이고, 왼쪽 <b className="text-neutral-300">단어를 누르면</b> 상세 카드가 떠요(다시 누르면 닫힘).
+              {studyReverse
+                ? "뜻을 보고 일본어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 잠깐 보여요."
+                : "오른쪽 칸을 꾹 누르면 정답이 잠깐 보이고, 왼쪽 단어를 누르면 상세 카드가 떠요."}
             </p>
             <div className="ml-auto flex shrink-0 items-center gap-2">
+              <button
+                onClick={() => setStudyReverse((v) => !v)}
+                className="rounded-lg border border-white/10 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:border-emerald-400/50"
+                title="보기 방향 전환"
+              >
+                {studyReverse ? "뜻 → 단어" : "단어 → 뜻"}
+              </button>
               <select
                 value={size}
                 onChange={(e) => changeSize(Number(e.target.value))}
@@ -337,6 +347,7 @@ export default function App() {
           <WordTable
             words={worksheet}
             progress={progress}
+            mode={studyReverse ? "ko" : "jp"}
             onShowCard={(word, x, y) =>
               setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
             }
