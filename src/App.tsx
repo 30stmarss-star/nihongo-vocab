@@ -3,10 +3,10 @@ import { BANDS, type Band, type Word } from "./data/types";
 import {
   buildWorksheet,
   defaultProgress,
-  introduce,
   isKnown,
   markKnown,
   markUnknown,
+  touch,
   type ProgressMap,
 } from "./lib/srs";
 import {
@@ -126,9 +126,9 @@ export default function App() {
       const next = { ...s.progress };
       const changed: string[] = [];
       for (const w of shownSheet) {
-        const intro = introduce(next[w.id], now);
-        if (intro !== next[w.id]) {
-          next[w.id] = intro;
+        const t = touch(next[w.id], now);
+        if (t !== next[w.id]) {
+          next[w.id] = t;
           changed.push(w.id);
         }
       }
@@ -170,9 +170,9 @@ export default function App() {
     const next = { ...prog };
     const changed: string[] = [];
     for (const w of sheet) {
-      const intro = introduce(next[w.id], now);
-      if (intro !== next[w.id]) {
-        next[w.id] = intro;
+      const t = touch(next[w.id], now);
+      if (t !== next[w.id]) {
+        next[w.id] = t;
         changed.push(w.id);
       }
     }
