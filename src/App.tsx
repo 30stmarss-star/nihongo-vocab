@@ -28,7 +28,9 @@ import { SetPassword } from "./components/SetPassword";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
-type View = "study" | "learned" | "kanji" | "tutor" | "scan";
+type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account";
+
+const HINT_KEY = "hint.longpress.v1";
 type Phase = "loading" | "login" | "ready";
 
 export default function App() {
@@ -41,6 +43,16 @@ export default function App() {
   const [band, setBand] = useState<Band | null>(null);
   const [size, setSize] = useState(DEFAULT_SIZE);
   const [view, setView] = useState<View>("study");
+  // 보조 기능(닮은꼴·튜터·계정) 더보기 메뉴 열림 상태
+  const [menuOpen, setMenuOpen] = useState(false);
+  // 학습지 사용법 안내: 첫 접속 때 1회만 팝업
+  const [showHint, setShowHint] = useState(() => {
+    try {
+      return !localStorage.getItem(HINT_KEY);
+    } catch {
+      return false;
+    }
+  });
   // 외운 단어 뷰: false=일본어 보기(뜻 가림), true=뜻 보기(단어·독음 가림, 거꾸로 복습)
   const [learnedReverse, setLearnedReverse] = useState(false);
   // 학습지 뷰 방향: true=한국어→일본어(뜻 보고 단어 떠올리기, 메인 루트), false=일본어→뜻
@@ -230,6 +242,20 @@ export default function App() {
     [band, progress, words]
   );
 
+  function dismissHint() {
+    try {
+      localStorage.setItem(HINT_KEY, "1");
+    } catch {
+      /* noop */
+    }
+    setShowHint(false);
+  }
+
+  function go(v: View) {
+    setView(v);
+    setMenuOpen(false);
+  }
+
   // ── 로딩 / 로그인 화면 ──
   if (phase === "loading") {
     return (
@@ -284,17 +310,70 @@ export default function App() {
             </option>
           ))}
         </select>
-        {CLOUD && userId && (
-          <div className="ml-auto flex items-center gap-3">
-            <SetPassword />
-            <button
-              onClick={() => supabase!.auth.signOut({ scope: "local" })}
-              className="text-xs text-neutral-500 hover:text-neutral-300"
-            >
-              로그아웃
-            </button>
-          </div>
-        )}
+        {/* 보조 기능: 닮은꼴·튜터·계정을 '더보기' 메뉴로 모음 */}
+        <div className="relative ml-auto">
+          <button
+            onClick={() => setMenuOpen((o) => !o)}
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            className="rounded-lg border border-white/10 bg-neutral-900 px-2.5 py-1 text-sm text-neutral-300 transition hover:border-white/25 hover:text-neutral-100"
+          >
+            더보기 ⋯
+          </button>
+          {menuOpen && (
+            <>
+              <button
+                type="button"
+                aria-label="메뉴 닫기"
+                className="fixed inset-0 z-40 cursor-default"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div
+                role="menu"
+                className="absolute right-0 z-50 mt-2 w-48 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 py-1 shadow-xl shadow-black/50"
+              >
+                <button
+                  role="menuitem"
+                  onClick={() => go("kanji")}
+                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
+                >
+                  닮은꼴 한자
+                </button>
+                {CLOUD && userId && (
+                  <button
+                    role="menuitem"
+                    onClick={() => go("tutor")}
+                    className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
+                  >
+                    튜터 💬
+                  </button>
+                )}
+                {CLOUD && userId && (
+                  <>
+                    <div className="my-1 h-px bg-white/10" />
+                    <button
+                      role="menuitem"
+                      onClick={() => go("account")}
+                      className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
+                    >
+                      🔑 비밀번호 설정
+                    </button>
+                    <button
+                      role="menuitem"
+                      onClick={() => {
+                        setMenuOpen(false);
+                        supabase!.auth.signOut({ scope: "local" });
+                      }}
+                      className="block w-full px-4 py-2 text-left text-sm text-neutral-400 hover:bg-white/5 hover:text-neutral-200"
+                    >
+                      로그아웃
+                    </button>
+                  </>
+                )}
+              </div>
+            </>
+          )}
+        </div>
       </header>
 
       {/* 탭: 학습지 / 외운 단어 */}
@@ -319,16 +398,6 @@ export default function App() {
         >
           외운 단어 {learnedWords.length}
         </button>
-        <button
-          onClick={() => setView("kanji")}
-          className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-            view === "kanji"
-              ? "bg-neutral-700 text-white"
-              : "text-neutral-400 hover:text-neutral-200"
-          }`}
-        >
-          닮은꼴
-        </button>
         {CLOUD && userId && (
           <button
             onClick={() => setView("scan")}
@@ -341,21 +410,20 @@ export default function App() {
             촬영 📷
           </button>
         )}
-        {CLOUD && userId && (
-          <button
-            onClick={() => setView("tutor")}
-            className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-              view === "tutor"
-                ? "bg-neutral-700 text-white"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            튜터 💬
-          </button>
-        )}
       </div>
 
-      {view === "scan" ? (
+      {(view === "kanji" || view === "tutor" || view === "account") && (
+        <button
+          onClick={() => setView("study")}
+          className="mb-3 -mt-1 text-sm text-neutral-400 transition hover:text-neutral-200"
+        >
+          ← 학습으로 돌아가기
+        </button>
+      )}
+
+      {view === "account" ? (
+        <SetPassword inline />
+      ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
       ) : view === "tutor" ? (
         <Chat />
@@ -365,9 +433,7 @@ export default function App() {
         <>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
-              {studyReverse
-                ? "뜻을 보고 일본어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 잠깐 보여요."
-                : "오른쪽 칸을 꾹 누르면 정답이 잠깐 보이고, 왼쪽 단어를 누르면 상세 카드가 떠요."}
+              {studyReverse ? "뜻 → 일본어" : "일본어 → 뜻"}
             </p>
             <div className="ml-auto flex shrink-0 items-center gap-2">
               <button
@@ -456,6 +522,44 @@ export default function App() {
           />
           <WordCard word={card.word} x={card.x} y={card.y} />
         </>
+      )}
+
+      {/* 첫 접속 1회: 학습지 사용법 안내 */}
+      {showHint && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-6"
+          onClick={dismissHint}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-white/10 bg-neutral-900 p-5 shadow-2xl shadow-black/60"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-base font-bold text-white">학습지 사용법</h2>
+            <ul className="mt-3 space-y-2 text-sm text-neutral-300">
+              <li>
+                · <b className="text-neutral-100">오른쪽 영역을 꾹 누르면</b> 정답(독음·뜻)이
+                잠깐 보여요.
+              </li>
+              <li>
+                · <b className="text-neutral-100">왼쪽 단어를 누르면</b> 상세 카드가 떠요.
+              </li>
+              <li>
+                · 다 외웠으면 오른쪽 <span className="text-emerald-300">✓</span> 를 눌러
+                체크하세요.
+              </li>
+              <li>
+                · 상단 <b className="text-neutral-100">방향 전환</b> 버튼으로 한국어→일본어로도
+                연습할 수 있어요.
+              </li>
+            </ul>
+            <button
+              onClick={dismissHint}
+              className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
+            >
+              알겠어요
+            </button>
+          </div>
+        </div>
       )}
     </main>
   );

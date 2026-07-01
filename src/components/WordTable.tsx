@@ -106,8 +106,9 @@ function WordRow({
         <span className={ko ? "line-clamp-2" : "truncate"}>{promptText}</span>
       </button>
 
-      {/* 정답(가림) 영역: 꾹 누르고 있는 동안만 보임.
-          행 전체 높이가 터치 판정이라 굵은 손가락도 쉽게 눌린다. */}
+      {/* 정답(가림) 영역: 왼쪽 공개 칸을 뺀 '행의 나머지 전체'가 터치 판정.
+          꾹 누르고 있는 동안만 정답이 보인다(굵은 손가락도 어디를 눌러도 열림).
+          오직 아래 체크 버튼 위에서만 공개 대신 '암기 토글'이 동작한다. */}
       <div
         className="no-select relative flex flex-1 cursor-pointer items-center py-2.5"
         style={{ touchAction: "none" }}
@@ -119,31 +120,35 @@ function WordRow({
         onPointerUp={() => setRevealed(false)}
         onPointerCancel={() => setRevealed(false)}
       >
-        <div className="grid w-full grid-cols-2 gap-4">
+        <div className="grid flex-1 grid-cols-2 gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
-      </div>
 
-      {/* 암기 체크 (토글) */}
-      <div className="no-select flex w-[56px] shrink-0 items-center justify-center">
-        <button
-          type="button"
-          aria-label={known ? "암기 해제" : "암기 완료"}
-          aria-pressed={known}
-          draggable={false}
-          onClick={toggle}
-          onContextMenu={(e) => e.preventDefault()}
-          style={{ touchAction: "manipulation" }}
-          className={[
-            "no-select grid h-8 w-8 place-items-center rounded-full text-sm transition active:scale-90",
-            known
-              ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-              : "border border-white/25 text-transparent hover:border-emerald-400/70",
-          ].join(" ")}
+        {/* 암기 체크 (토글) — 이 영역에서는 공개가 아니라 토글.
+            포인터 이벤트가 위 공개 영역으로 전파되지 않게 막아 눌러도 공개되지 않게 한다. */}
+        <div
+          className="no-select flex w-[56px] shrink-0 items-center justify-center"
+          onPointerDown={(e) => e.stopPropagation()}
         >
-          ✓
-        </button>
+          <button
+            type="button"
+            aria-label={known ? "암기 해제" : "암기 완료"}
+            aria-pressed={known}
+            draggable={false}
+            onClick={toggle}
+            onContextMenu={(e) => e.preventDefault()}
+            style={{ touchAction: "manipulation" }}
+            className={[
+              "no-select grid h-8 w-8 place-items-center rounded-full text-sm transition active:scale-90",
+              known
+                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
+                : "border border-white/25 text-transparent hover:border-emerald-400/70",
+            ].join(" ")}
+          >
+            ✓
+          </button>
+        </div>
       </div>
 
       {/* 암기 체크 시 살짝 떠오르는 피드백 */}
