@@ -126,12 +126,18 @@ export function markUnknown(p: Progress, now: number): Progress {
   };
 }
 
-/** 한 학습지에 새로 도입할 새 단어의 기본 개수 (복습과 골고루 섞이도록 적당히) */
-const NEW_PER_SHEET = 7;
-/** 아직 안 외운(복습 대기) 단어가 이만큼 쌓이면 새 단어 도입을 줄임 */
-const BACKLOG_SOFT = 35;
-/** 더 쌓이면 새 단어를 거의 멈추고 밀린 것부터 따라잡게 함 */
-const BACKLOG_HARD = 60;
+// ── 학습지 구성(30문항 기준) — 표준 단어앱(고정 복습 몫 + 상한) 방식 ──
+/** 외운 단어 복습 몫: 학습지의 30%(상한 KNOWN_CAP). 간격과 무관하게 매번 안정적으로 복습을 끼워준다. */
+const KNOWN_SHARE = 0.3;
+const KNOWN_CAP = 10;
+/** 같은 세션에서 방금 나온 외운 단어가 곧바로 또 나오지 않게 하는 휴식(1시간). 하루 뒤엔 모두 다시 후보. */
+const KNOWN_REST_MS = 60 * 60 * 1000;
+/** 새 단어 기본 도입 수. '오늘 만기된 못 외운 단어'가 밀리면 줄인다(완전히 멈추진 않음). */
+const NEW_BASE = 6;
+const DUE_LEARN_SOFT = 15; // 오늘 만기된 못외운 단어 ≥15 → 새 단어 4
+const DUE_LEARN_HARD = 30; // ≥30 → 새 단어 2
+/** 못 외운 단어의 복습 만기 간격(=간격반복 0단계). 이 시간이 지나야 다시 후보(세션 내 재탕 방지). */
+const LEARN_INTERVAL_MS = INTERVALS_DAYS[0] * DAY;
 
 /** 가중치 비복원 추출 (weightFn으로 항목별 가중치 계산) */
 function weightedSampleBy(
@@ -177,12 +183,13 @@ function shuffle<T>(arr: T[], rand: () => number): T[] {
 /**
  * 학습지 생성 — 다양성과 간격을 함께 고려한다.
  *
- * - 새 단어를 매번 조금씩(NEW_PER_SHEET) 도입하고 나머지는 복습으로 채운다.
- * - 선정은 '중요도 × 복습 만기 × 스캔 보정'을 곱한 가중치의 무작위 추출이라,
- *   중요 단어를 우대하면서도 매번 같은 단어만 반복되지 않는다.
- * - 촬영(priority)으로 넣은 단어는 맨 앞에 고정하지 않고 가중치를 높여 자연스럽게
- *   자주 나오게 한다(우선하되 독점하지 않음). 순서도 매번 섞인다.
- * - 실제 다양성은 App이 학습지에 나온 단어를 touch()로 잠시 쉬게 해 확보한다.
+ * 표준 단어앱(고정 복습 몫 + 상한) 방식. 버킷별로 '따로' 추출한다:
+ * - 외운 단어 복습 = 고정 몫(30%·상한 10). 간격이 몫의 '존재'를 막지 않고 '순위'만 정한다
+ *   → 같은 세션에서도 안정적으로 복습이 끼되(비지 않고), 도배되지도 않는다.
+ * - 못 외운 단어 = '오늘 복습 만기'된 것만 후보 → 방금 본 단어가 곧바로 재탕되지 않는다.
+ * - 새 단어 = 기본 6개, 밀린 복습(오늘 만기 못외운 수)이 많으면 줄인다.
+ * - 부족분은 새단어 → 외운(자격) → 쉬는 못외운(오래된 순) → 쉬는 외운 순으로 백필.
+ * - freq(중요도)·스캔 보정은 각 버킷 안 순위에 반영. 순서는 매번 섞는다.
  */
 export function buildWorksheet(
   pool: Word[],
@@ -196,71 +203,64 @@ export function buildWorksheet(
   const boost = (w: Word) =>
     scan && scan.has(w.id) && !isKnown(progress[w.id]) ? SCAN_BOOST : 1;
 
-  // 풀을 셋으로: 새 단어(fresh) / 학습 중(learning: 봤지만 아직 못 외움) / 외운 것(known)
+  // 1) 버킷 분리(왕체크 제외). 못 외운/외운은 다시 '오늘 복습 만기(due/elig)'와 '휴식(rest)'으로.
   const fresh: Word[] = [];
-  const learning: Word[] = [];
-  const known: Word[] = [];
+  const dueLearning: Word[] = [];
+  const restLearning: Word[] = [];
+  const eligKnown: Word[] = [];
+  const restKnown: Word[] = [];
   for (const w of pool) {
     const p = progress[w.id];
     if (isRetired(p)) continue; // 왕체크(완전 암기) → 완전히 제외
     if (!p || p.seenCount === 0) fresh.push(w);
-    else if (isKnown(p)) known.push(w);
-    else learning.push(w);
+    else if (isKnown(p)) (now - p.lastSeen >= KNOWN_REST_MS ? eligKnown : restKnown).push(w);
+    else (now - p.lastSeen >= LEARN_INTERVAL_MS ? dueLearning : restLearning).push(w);
   }
 
-  // 아직 못 외운 게 많이 밀리면 새 단어 도입을 줄여 먼저 따라잡게 함
-  const newCap =
-    learning.length >= BACKLOG_HARD ? 1 : learning.length >= BACKLOG_SOFT ? 3 : NEW_PER_SHEET;
+  // 2) 몫 배정: 외운 복습(고정%·상한) / 새 단어(오늘 밀린 만큼 줄임) / 나머지는 못 외운(오늘 만기)
+  const knownQuota = Math.min(Math.round(count * KNOWN_SHARE), KNOWN_CAP);
+  const newQuota =
+    dueLearning.length >= DUE_LEARN_HARD ? 2 : dueLearning.length >= DUE_LEARN_SOFT ? 4 : NEW_BASE;
+  const learnQuota = Math.max(0, count - knownQuota - newQuota);
 
-  // 새 단어: 중요도·스캔 보정 가중치로 추출
-  const freshWeight = (w: Word) => NEW_WEIGHT * importanceFactor(w.freq) * boost(w);
-  const newPicks = weightedSampleBy(
-    fresh,
-    Math.min(newCap, fresh.length, count),
-    rand,
-    freshWeight
-  );
+  // 3) 버킷 '안에서'의 우선순위 가중치 (버킷 간 비교 아님).
+  const freshW = (w: Word) => importanceFactor(w.freq) * boost(w);
+  const learnW = (w: Word) => {
+    const r = (now - (progress[w.id]?.lastSeen ?? 0)) / LEARN_INTERVAL_MS;
+    return (0.7 + 0.3 * Math.min(r, 3)) * importanceFactor(w.freq) * boost(w);
+  };
+  const knownW = (w: Word) => {
+    const p = progress[w.id]!;
+    const iv = INTERVALS_DAYS[Math.min(p.mastery, 5)] * DAY;
+    const r = (now - p.lastSeen) / iv;
+    // 복습 만기면 우선순위↑, 아니면 만기에 가까울수록↑ (만기 여부가 '몫 존재'를 막지 않고 '순위'만 정함)
+    const due = r >= 1 ? 1.5 + 0.5 * Math.min(r - 1, 2) : 0.15 + 0.85 * r;
+    return due * (1.15 - 0.1 * Math.min(p.mastery, 5)) * importanceFactor(w.freq);
+  };
 
-  const remaining = count - newPicks.length;
+  // 4) 1차 추출 — 풀이 몫보다 적으면 덜 뽑는다(억지로 채우지 않음 = 방금 본 단어 재탕 방지).
+  const learnPicks = weightedSampleBy(dueLearning, Math.min(learnQuota, dueLearning.length), rand, learnW);
+  const knownPicks = weightedSampleBy(eligKnown, Math.min(knownQuota, eligKnown.length), rand, knownW);
+  const newPicks = weightedSampleBy(fresh, Math.min(newQuota, fresh.length, count), rand, freshW);
 
-  // 외운 단어 복습 몫(상한 ≈ 남은 칸의 1/4): 복습 시점이 된 것을 강하게 우선하되,
-  // 대기 중인 것도 소량 섞어 '가끔은 복습으로 나오되 도배되지는 않게'.
-  //  (min 0.03 → 대기 중 외운 단어도 완전히 0은 아님, 상한이 있어 우르르 나오지 않음)
-  const knownWeight = (w: Word) =>
-    Math.max(0.03, weightFor(progress[w.id], now)) * importanceFactor(w.freq);
-  const knownQuota = Math.min(known.length, Math.round(remaining * 0.25));
-  const knownPicks = weightedSampleBy(known, knownQuota, rand, knownWeight);
-
-  // 나머지는 학습 중(못 외운) 단어로 채운다 — 학습지의 주력.
-  const learnWeight = (w: Word) =>
-    weightFor(progress[w.id], now) * importanceFactor(w.freq) * boost(w);
-  const learnPicks = weightedSampleBy(
-    learning,
-    remaining - knownPicks.length,
-    rand,
-    learnWeight
-  );
-
-  // 칸이 남으면 ① 남은 새 단어 ② 남은 외운 단어 순으로 채움
-  const used = new Set([...newPicks, ...knownPicks, ...learnPicks].map((w) => w.id));
-  const extra: Word[] = [];
-  let shortfall = count - newPicks.length - knownPicks.length - learnPicks.length;
-  if (shortfall > 0) {
-    const more = weightedSampleBy(
-      fresh.filter((w) => !used.has(w.id)),
-      shortfall,
-      rand,
-      freshWeight
-    );
-    more.forEach((w) => used.add(w.id));
-    extra.push(...more);
-    shortfall -= more.length;
-  }
-  if (shortfall > 0) {
-    extra.push(
-      ...weightedSampleBy(known.filter((w) => !used.has(w.id)), shortfall, rand, knownWeight)
-    );
+  // 5) 부족분 백필(엄격한 우선순위): 새 단어 → 외운(자격) → 쉬는 못외운(오래된 순) → 쉬는 외운(오래된 순).
+  //    학습 풀이 얇을 때 '방금 본 못외운 단어'가 아니라 새 단어로 먼저 채워진다.
+  const picked: Word[] = [...newPicks, ...learnPicks, ...knownPicks];
+  const used = new Set(picked.map((w) => w.id));
+  const lruW = (w: Word) => now - (progress[w.id]?.lastSeen ?? 0) + 1; // 오래 안 나온 것일수록↑
+  const chain: [Word[], (w: Word) => number][] = [
+    [fresh, freshW],
+    [eligKnown, knownW],
+    [restLearning, lruW],
+    [restKnown, lruW],
+  ];
+  for (const [src, wfn] of chain) {
+    const need = count - picked.length;
+    if (need <= 0) break;
+    const more = weightedSampleBy(src.filter((w) => !used.has(w.id)), need, rand, wfn);
+    for (const w of more) used.add(w.id);
+    picked.push(...more);
   }
 
-  return shuffle([...newPicks, ...knownPicks, ...learnPicks, ...extra], rand);
+  return shuffle(picked, rand);
 }

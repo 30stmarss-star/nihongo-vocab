@@ -29,7 +29,6 @@ import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
 import { Quiz, type QuizResult } from "./components/Quiz";
 
-const SIZE_OPTIONS = [10, 15, 20, 30];
 
 type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz";
 
@@ -44,7 +43,7 @@ export default function App() {
   const [words, setWords] = useState<Word[]>([]);
   const [progress, setProgress] = useState<ProgressMap>({});
   const [band, setBand] = useState<Band | null>(null);
-  const [size, setSize] = useState(DEFAULT_SIZE);
+  const size = DEFAULT_SIZE; // 학습지 크기 30개 고정
   const [view, setView] = useState<View>("study");
   // 보조 기능(닮은꼴·튜터·계정) 더보기 메뉴 열림 상태
   const [menuOpen, setMenuOpen] = useState(false);
@@ -99,10 +98,9 @@ export default function App() {
     if (cached && cached.words.length) {
       setWords(cached.words);
       setProgress(cached.progress);
-      setSize(cached.size);
       if (cached.band) {
         setBand(cached.band);
-        const { sheet } = makeSheet(cached.band, cached.size, cached.progress, cached.words);
+        const { sheet } = makeSheet(cached.band, size, cached.progress, cached.words);
         setWorksheet(sheet);
         shownSheet = sheet;
         shownBand = cached.band;
@@ -118,7 +116,6 @@ export default function App() {
       loadScannedQueue(uid),
     ]);
     setWords(s.words);
-    setSize(s.size);
     setScanned(scannedSet);
 
     if (s.band && shownSheet && s.band === shownBand && scannedSet.size === 0) {
@@ -140,7 +137,7 @@ export default function App() {
     } else if (s.band) {
       // 캐시가 없었거나(첫 방문) 밴드가 달라졌거나 스캔 우선 단어가 있으면 새로 만든다.
       setBand(s.band);
-      const { sheet, next, changed } = makeSheet(s.band, s.size, s.progress, s.words, scannedSet);
+      const { sheet, next, changed } = makeSheet(s.band, size, s.progress, s.words, scannedSet);
       setProgress(next);
       setWorksheet(sheet);
       if (changed.length) persistProgress(uid, next, changed);
@@ -201,12 +198,6 @@ export default function App() {
       setProgress(next);
       persistProgress(userId, next, changed);
     }
-  }
-
-  function changeSize(n: number) {
-    setSize(n);
-    if (band) persistSettings(userId, band, n);
-    regenerate(n);
   }
 
   /** 촬영 저장 완료: 단어 풀에 병합 + 우선순위 등록 + 학습지 맨 앞에 반영 후 학습지로 이동 */
@@ -512,18 +503,6 @@ export default function App() {
               >
                 {studyReverse ? "뜻 → 단어" : "단어 → 뜻"}
               </button>
-              <select
-                value={size}
-                onChange={(e) => changeSize(Number(e.target.value))}
-                className="rounded-lg border border-white/10 bg-neutral-900 px-2 py-1 text-sm text-neutral-200"
-                title="한 번에 보여줄 단어 수"
-              >
-                {SIZE_OPTIONS.map((n) => (
-                  <option key={n} value={n}>
-                    {n}개씩
-                  </option>
-                ))}
-              </select>
               <button
                 onClick={() => regenerate()}
                 className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/30"
