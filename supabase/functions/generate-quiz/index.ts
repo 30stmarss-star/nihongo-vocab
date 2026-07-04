@@ -9,7 +9,8 @@
 //        sentence 는 대상 단어를 "＿＿" 로 가린 일본어 문장.
 
 const MODEL = "claude-sonnet-5"; // 속도·비용 우선 (문장 생성엔 충분)
-const MAX_TOKENS = 8000;
+// Sonnet 5는 응답 앞에 thinking 블록을 넣어 토큰을 먹으므로 넉넉히 (작으면 JSON이 잘림)
+const MAX_TOKENS = 16000;
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -41,9 +42,7 @@ const SCHEMA = {
           choices: {
             type: "array",
             items: { type: "string" },
-            minItems: 4,
-            maxItems: 4,
-            description: "빈칸에 들어갈 후보 4개(정답 1 + 오답 3), 같은 활용형·품사",
+            description: "빈칸에 들어갈 후보 **정확히 4개**(정답 1 + 오답 3), 같은 활용형·품사",
           },
           answerIndex: { type: "integer", description: "choices 중 정답 위치(0~3)" },
         },
