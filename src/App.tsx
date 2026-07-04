@@ -250,20 +250,37 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [band, progress, words]);
 
-  // 외운 단어 뷰의 실제 표시 목록: 체크를 풀어도 ~1초간 남겨 되돌릴 기회를 준다.
+  // 외운 단어 뷰의 실제 표시 목록.
+  //  - 뷰에 '처음 들어올 때'만 왕체크를 하단으로 모아 정렬(스냅샷).
+  //  - 뷰 안에서 체크를 바꿔도 재정렬하지 않고 제자리 유지 → 금색 전환이 그 자리에서 보이고,
+  //    "완전 암기(금색)"와 "해제(삭제)"가 구분된다.
+  //  - 체크를 풀면(외운 목록에서 빠지면) ~3초 뒤 제거(되돌릴 여유).
   const [learnedDisplay, setLearnedDisplay] = useState<Word[]>([]);
   const lingerTimers = useRef<Map<string, number>>(new Map());
+  const prevViewRef = useRef<View>(view);
 
   useEffect(() => {
-    // 외운 단어 뷰가 아니면 지연 없이 즉시 동기화(대기 타이머 정리).
+    const wasLearned = prevViewRef.current === "learned";
+    prevViewRef.current = view;
+
     if (view !== "learned") {
+      for (const t of lingerTimers.current.values()) window.clearTimeout(t);
+      lingerTimers.current.clear();
+      return;
+    }
+
+    // 처음 진입: 정렬 스냅샷(왕체크 하단). learnedWords는 이미 그 순서로 정렬돼 있다.
+    if (!wasLearned) {
       for (const t of lingerTimers.current.values()) window.clearTimeout(t);
       lingerTimers.current.clear();
       setLearnedDisplay(learnedWords);
       return;
     }
+
+    // 진입 후 progress 변경: 재정렬 없이 제자리 유지 + 지연 삭제만.
     const trueIds = new Set(learnedWords.map((w) => w.id));
-    // 다시 체크돼 되살아난 단어는 제거 예약을 취소한다.
+    const byId = new Map(learnedWords.map((w) => [w.id, w]));
+    // 다시 체크돼 되살아난 단어는 제거 예약 취소.
     for (const [id, t] of lingerTimers.current) {
       if (trueIds.has(id)) {
         window.clearTimeout(t);
@@ -271,21 +288,20 @@ export default function App() {
       }
     }
     setLearnedDisplay((prev) => {
-      // 목록에서 빠진 단어는 1초 뒤 제거 예약(그동안 화면엔 남겨 되돌릴 여유를 준다).
+      // 외운 목록에서 빠진 단어는 3초 뒤 제거 예약(그동안 제자리에 남겨 되돌릴 여유).
       prev.forEach((w) => {
         if (!trueIds.has(w.id) && !lingerTimers.current.has(w.id)) {
           const t = window.setTimeout(() => {
             lingerTimers.current.delete(w.id);
             setLearnedDisplay((cur) => cur.filter((x) => x.id !== w.id));
-          }, 1000);
+          }, 3000);
           lingerTimers.current.set(w.id, t);
         }
       });
-      // 최신 정렬(왕체크 하단)을 반영하되, 사라지는 중인 단어는 이전 위치에 끼워 유지.
-      const next = [...learnedWords];
-      prev.forEach((w, i) => {
-        if (!trueIds.has(w.id)) next.splice(Math.min(i, next.length), 0, w);
-      });
+      // 순서 그대로 유지, 데이터만 최신화(사라지는 중이면 옛 객체 보존). 신규 외운 단어는 뒤에 추가.
+      const shown = new Set(prev.map((w) => w.id));
+      const next = prev.map((w) => byId.get(w.id) ?? w);
+      for (const w of learnedWords) if (!shown.has(w.id)) next.push(w);
       return next;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -535,7 +551,7 @@ export default function App() {
             <p className="text-xs text-neutral-500">
               {learnedReverse
                 ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
-                : "외운 단어예요. 체크를 누르면 금색(완전 암기·학습지 제외)으로, 한 번 더 누르면 해제돼요. 해제하면 잠시 뒤 목록에서 빠져요."}
+                : "외운 단어예요. 체크를 누르면 제자리에서 금색(완전 암기·학습지 제외)으로 변하고, 한 번 더 누르면 해제돼 잠시 뒤 사라져요. 금색은 다시 열 때 아래로 모여요."}
             </p>
             <button
               onClick={() => setLearnedReverse((v) => !v)}
