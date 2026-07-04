@@ -221,19 +221,30 @@ export function buildWorksheet(
     freshWeight
   );
 
-  // 복습 풀 = 학습 중 단어(항상) + 외운 단어 중 '복습 시점이 된' 것만.
-  //  → 아직 복습 때가 아닌 외운 단어는 새어들지 않아, 매번 외운 단어가 우르르 나오지 않고
-  //    비율도 안정된다. (외운 단어는 자기 간격이 지나야 복습으로 등장)
-  const reviewWeight = (w: Word) =>
-    weightFor(progress[w.id], now) * importanceFactor(w.freq) * boost(w);
-  const dueKnown = known.filter((w) => weightFor(progress[w.id], now) > FLOOR_WEIGHT);
-  const reviewPool = [...learning, ...dueKnown];
-  const reviewPicks = weightedSampleBy(reviewPool, count - newPicks.length, rand, reviewWeight);
+  const remaining = count - newPicks.length;
 
-  // 칸이 남으면 ① 남은 새 단어로, ② 그래도 남으면 '최후'로 복습 때 아닌 외운 단어로 채움
-  const used = new Set([...newPicks, ...reviewPicks].map((w) => w.id));
+  // 외운 단어 복습 몫(상한 ≈ 남은 칸의 1/4): 복습 시점이 된 것을 강하게 우선하되,
+  // 대기 중인 것도 소량 섞어 '가끔은 복습으로 나오되 도배되지는 않게'.
+  //  (min 0.03 → 대기 중 외운 단어도 완전히 0은 아님, 상한이 있어 우르르 나오지 않음)
+  const knownWeight = (w: Word) =>
+    Math.max(0.03, weightFor(progress[w.id], now)) * importanceFactor(w.freq);
+  const knownQuota = Math.min(known.length, Math.round(remaining * 0.25));
+  const knownPicks = weightedSampleBy(known, knownQuota, rand, knownWeight);
+
+  // 나머지는 학습 중(못 외운) 단어로 채운다 — 학습지의 주력.
+  const learnWeight = (w: Word) =>
+    weightFor(progress[w.id], now) * importanceFactor(w.freq) * boost(w);
+  const learnPicks = weightedSampleBy(
+    learning,
+    remaining - knownPicks.length,
+    rand,
+    learnWeight
+  );
+
+  // 칸이 남으면 ① 남은 새 단어 ② 남은 외운 단어 순으로 채움
+  const used = new Set([...newPicks, ...knownPicks, ...learnPicks].map((w) => w.id));
   const extra: Word[] = [];
-  let shortfall = count - newPicks.length - reviewPicks.length;
+  let shortfall = count - newPicks.length - knownPicks.length - learnPicks.length;
   if (shortfall > 0) {
     const more = weightedSampleBy(
       fresh.filter((w) => !used.has(w.id)),
@@ -246,11 +257,10 @@ export function buildWorksheet(
     shortfall -= more.length;
   }
   if (shortfall > 0) {
-    const resting = known.filter((w) => !used.has(w.id));
     extra.push(
-      ...weightedSampleBy(resting, shortfall, rand, (w) => importanceFactor(w.freq))
+      ...weightedSampleBy(known.filter((w) => !used.has(w.id)), shortfall, rand, knownWeight)
     );
   }
 
-  return shuffle([...newPicks, ...reviewPicks, ...extra], rand);
+  return shuffle([...newPicks, ...knownPicks, ...learnPicks, ...extra], rand);
 }
