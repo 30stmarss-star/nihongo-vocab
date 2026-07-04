@@ -34,13 +34,34 @@ const FLOOR_WEIGHT = 0.05;
 /** 촬영으로 넣은(아직 못 외운) 단어에 줄 가중치 배수 — 우선하되 독점하지 않게 */
 const SCAN_BOOST = 2.5;
 
+/**
+ * '왕체크'(완전 암기) 센티넬 숙련도.
+ * 일반 학습은 markKnown이 min(5, …)로 최대 5까지만 올리므로, 자연스러운 mastery는 0~5.
+ * 그보다 큰 6을 "다시 안 봐도 되는 완전 암기(은퇴)" 신호로 쓴다 → DB 마이그레이션 불필요.
+ */
+export const RETIRED_MASTERY = 6;
+
 export function defaultProgress(): Progress {
   return { mastery: 0, lastSeen: 0, seenCount: 0 };
 }
 
-/** "외운 단어"로 볼 기준 (한 번이라도 체크해서 숙련도가 붙은 상태) */
+/** "외운 단어"로 볼 기준 (한 번이라도 체크해서 숙련도가 붙은 상태 — 왕체크 포함) */
 export function isKnown(p: Progress | undefined): boolean {
   return !!p && p.seenCount > 0 && p.mastery >= 1;
+}
+
+/** '왕체크'(완전 암기): 학습지에 더 이상 등장하지 않는다. */
+export function isRetired(p: Progress | undefined): boolean {
+  return !!p && p.mastery >= RETIRED_MASTERY;
+}
+
+/** 왕체크 표시: 학습지에서 완전히 빼되 '외운 단어'에는 남긴다. */
+export function markRetired(p: Progress, now: number): Progress {
+  return {
+    mastery: RETIRED_MASTERY,
+    lastSeen: now,
+    seenCount: p.seenCount + 1,
+  };
 }
 
 /** 학습지에 처음 등장한(아직 안 본) 단어를 '도입됨' 상태로 기록 */
@@ -177,6 +198,7 @@ export function buildWorksheet(
   const fresh: Word[] = [];
   for (const w of pool) {
     const p = progress[w.id];
+    if (isRetired(p)) continue; // 왕체크(완전 암기) → 학습지에서 완전히 제외
     if (p && p.seenCount > 0) seen.push(w);
     else fresh.push(w);
   }

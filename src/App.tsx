@@ -4,7 +4,9 @@ import {
   buildWorksheet,
   defaultProgress,
   isKnown,
+  isRetired,
   markKnown,
+  markRetired,
   markUnknown,
   touch,
   type ProgressMap,
@@ -236,11 +238,58 @@ export default function App() {
     });
   }
 
-  const learnedWords = useMemo(
-    () => (band ? poolFor(band).filter((w) => isKnown(progress[w.id])) : []),
+  const learnedWords = useMemo(() => {
+    if (!band) return [];
+    const list = poolFor(band).filter((w) => isKnown(progress[w.id]));
+    // 왕체크(완전 암기)는 하단에 따로 모은다 — 위쪽엔 어중간하게 외운 것만 보이게.
+    // (그 외 순서는 원래대로. 안정 정렬이라 같은 그룹 내 순서는 유지된다.)
+    return list.sort(
+      (a, b) =>
+        (isRetired(progress[a.id]) ? 1 : 0) - (isRetired(progress[b.id]) ? 1 : 0)
+    );
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [band, progress, words]
-  );
+  }, [band, progress, words]);
+
+  // 외운 단어 뷰의 실제 표시 목록: 체크를 풀어도 ~1초간 남겨 되돌릴 기회를 준다.
+  const [learnedDisplay, setLearnedDisplay] = useState<Word[]>([]);
+  const lingerTimers = useRef<Map<string, number>>(new Map());
+
+  useEffect(() => {
+    // 외운 단어 뷰가 아니면 지연 없이 즉시 동기화(대기 타이머 정리).
+    if (view !== "learned") {
+      for (const t of lingerTimers.current.values()) window.clearTimeout(t);
+      lingerTimers.current.clear();
+      setLearnedDisplay(learnedWords);
+      return;
+    }
+    const trueIds = new Set(learnedWords.map((w) => w.id));
+    // 다시 체크돼 되살아난 단어는 제거 예약을 취소한다.
+    for (const [id, t] of lingerTimers.current) {
+      if (trueIds.has(id)) {
+        window.clearTimeout(t);
+        lingerTimers.current.delete(id);
+      }
+    }
+    setLearnedDisplay((prev) => {
+      // 목록에서 빠진 단어는 1초 뒤 제거 예약(그동안 화면엔 남겨 되돌릴 여유를 준다).
+      prev.forEach((w) => {
+        if (!trueIds.has(w.id) && !lingerTimers.current.has(w.id)) {
+          const t = window.setTimeout(() => {
+            lingerTimers.current.delete(w.id);
+            setLearnedDisplay((cur) => cur.filter((x) => x.id !== w.id));
+          }, 1000);
+          lingerTimers.current.set(w.id, t);
+        }
+      });
+      // 최신 정렬(왕체크 하단)을 반영하되, 사라지는 중인 단어는 이전 위치에 끼워 유지.
+      const next = [...learnedWords];
+      prev.forEach((w, i) => {
+        if (!trueIds.has(w.id)) next.splice(Math.min(i, next.length), 0, w);
+      });
+      return next;
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [learnedWords, view]);
 
   function dismissHint() {
     try {
@@ -470,6 +519,7 @@ export default function App() {
             }
             onKnown={(id) => update(id, markKnown)}
             onUnknown={(id) => update(id, markUnknown)}
+            onRetire={(id) => update(id, markRetired)}
           />
         </>
       ) : learnedWords.length === 0 ? (
@@ -485,7 +535,7 @@ export default function App() {
             <p className="text-xs text-neutral-500">
               {learnedReverse
                 ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
-                : "지금까지 외운 단어예요. ✓ 를 다시 누르면 목록에서 빠져요."}
+                : "외운 단어예요. 체크를 누르면 금색(완전 암기·학습지 제외)으로, 한 번 더 누르면 해제돼요. 해제하면 잠시 뒤 목록에서 빠져요."}
             </p>
             <button
               onClick={() => setLearnedReverse((v) => !v)}
@@ -496,7 +546,7 @@ export default function App() {
             </button>
           </div>
           <WordTable
-            words={learnedWords}
+            words={learnedDisplay}
             progress={progress}
             mode={learnedReverse ? "ko" : "jp"}
             onShowCard={(word, x, y) =>
@@ -504,6 +554,7 @@ export default function App() {
             }
             onKnown={(id) => update(id, markKnown)}
             onUnknown={(id) => update(id, markUnknown)}
+            onRetire={(id) => update(id, markRetired)}
           />
         </>
       )}
@@ -542,7 +593,9 @@ export default function App() {
               </li>
               <li>
                 · 다 외웠으면 오른쪽 <span className="text-emerald-300">✓</span> 를 눌러
-                체크하세요.
+                체크하세요. 한 번 더 누르면{" "}
+                <span className="text-amber-300">금색(완전 암기)</span> — 학습지에 다시
+                안 나와요.
               </li>
               <li>
                 · 상단 <b className="text-neutral-100">방향 전환</b> 버튼으로 한국어→일본어로도

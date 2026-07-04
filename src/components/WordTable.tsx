@@ -6,7 +6,7 @@ import {
 } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
-import type { Progress } from "../lib/srs";
+import { isKnown, isRetired, type Progress } from "../lib/srs";
 
 /**
  * mode:
@@ -22,6 +22,7 @@ interface Props {
   onShowCard: (word: Word, x: number, y: number) => void;
   onKnown: (id: string) => void;
   onUnknown: (id: string) => void;
+  onRetire: (id: string) => void;
   mode?: Mode;
 }
 
@@ -38,7 +39,7 @@ export function WordTable(props: Props) {
           <span>{ko ? "단어" : "독음(히라가나)"}</span>
           <span>{ko ? "독음(히라가나)" : "뜻"}</span>
         </div>
-        <div className="w-[56px] shrink-0 text-center">암기</div>
+        <div className="w-[76px] shrink-0 text-center">암기</div>
       </div>
 
       <ul>
@@ -56,10 +57,12 @@ function WordRow({
   onShowCard,
   onKnown,
   onUnknown,
+  onRetire,
   mode = "jp",
 }: { word: Word } & Omit<Props, "words">) {
   const [revealed, setRevealed] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [flashKind, setFlashKind] = useState<"known" | "retired">("known");
   const flashTimer = useRef<number | undefined>(undefined);
 
   // 정답 공개(press-hold): 지금 잘 작동하는 '가림막'과 동일한 방식.
@@ -91,7 +94,8 @@ function WordRow({
   };
 
   const p = progress[word.id];
-  const known = !!p && p.seenCount > 0 && p.mastery >= 1;
+  const retired = isRetired(p); // 왕체크(완전 암기)
+  const known = isKnown(p) && !retired; // 일반 체크
   const ko = mode === "ko";
 
   // 후행 결합형(예: ~ながら)이면 일본어 표제어·독음 앞에 ~를 붙인다.
@@ -104,15 +108,22 @@ function WordRow({
   const maskedLeft = ko ? jpKanji : jpKana; // 가려진 첫 칸
   const maskedRight = ko ? jpKana : word.meaning; // 가려진 둘째 칸
 
+  // 3단 토글: 없음 → 체크 → 왕체크(완전 암기) → 없음
   function toggle() {
-    if (known) {
-      onUnknown(word.id);
-    } else {
-      onKnown(word.id);
-      setFlash(true);
-      window.clearTimeout(flashTimer.current);
-      flashTimer.current = window.setTimeout(() => setFlash(false), 650);
+    if (retired) {
+      onUnknown(word.id); // 왕체크 → 해제
+      return;
     }
+    if (known) {
+      onRetire(word.id); // 체크 → 왕체크
+      setFlashKind("retired");
+    } else {
+      onKnown(word.id); // 없음 → 체크
+      setFlashKind("known");
+    }
+    setFlash(true);
+    window.clearTimeout(flashTimer.current);
+    flashTimer.current = window.setTimeout(() => setFlash(false), 650);
   }
 
   return (
@@ -120,8 +131,8 @@ function WordRow({
       className={[
         "relative flex min-h-[3.25rem] items-stretch px-3 py-1.5 transition-colors",
         "border-b border-white/5 last:border-0",
-        known ? "bg-emerald-500/[0.07]" : "",
-        flash ? "bg-emerald-500/15" : "",
+        retired ? "bg-amber-400/[0.06]" : known ? "bg-emerald-500/[0.07]" : "",
+        flash ? (flashKind === "retired" ? "bg-amber-400/15" : "bg-emerald-500/15") : "",
       ].join(" ")}
     >
       {/* 왼쪽 고정폭 칸(정렬 유지). 빈 공간은 오버레이로 통과(pointer-events-none),
@@ -155,23 +166,33 @@ function WordRow({
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
 
-        <div className="no-select relative z-20 flex w-[56px] shrink-0 items-center justify-center">
+        {/* 암기 체크: 탭 영역을 넓혀(폭 76px·행 전체 높이) 체크 왼쪽 빈 곳을 눌러도 반응.
+            보이는 체크 원은 작게. 없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
+        <div className="no-select relative z-20 flex w-[76px] shrink-0 items-stretch">
           <button
             type="button"
-            aria-label={known ? "암기 해제" : "암기 완료"}
-            aria-pressed={known}
+            aria-label={
+              retired ? "완전 암기 해제" : known ? "완전 암기로 표시" : "암기 완료"
+            }
+            aria-pressed={known || retired}
             draggable={false}
             onClick={toggle}
             onContextMenu={(e) => e.preventDefault()}
             style={{ touchAction: "manipulation" }}
-            className={[
-              "no-select grid h-8 w-8 place-items-center rounded-full text-sm transition active:scale-90",
-              known
-                ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-                : "border border-white/25 text-transparent hover:border-emerald-400/70",
-            ].join(" ")}
+            className="group no-select grid h-full w-full cursor-pointer place-items-center transition active:scale-95"
           >
-            ✓
+            <span
+              className={[
+                "grid h-6 w-6 place-items-center rounded-full text-xs font-bold transition",
+                retired
+                  ? "bg-amber-400 text-amber-950 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)] ring-2 ring-amber-300/70"
+                  : known
+                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
+                    : "border border-white/25 text-transparent group-hover:border-emerald-400/70",
+              ].join(" ")}
+            >
+              ✓
+            </span>
           </button>
         </div>
       </div>
@@ -182,8 +203,13 @@ function WordRow({
 
       {/* 암기 체크 시 살짝 떠오르는 피드백 */}
       {flash && (
-        <span className="pointer-events-none absolute right-16 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm text-emerald-400">
-          ✓ 외웠어요!
+        <span
+          className={[
+            "pointer-events-none absolute right-16 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
+            flashKind === "retired" ? "text-amber-300" : "text-emerald-400",
+          ].join(" ")}
+        >
+          {flashKind === "retired" ? "⭐ 완전 정복!" : "✓ 외웠어요!"}
         </span>
       )}
     </li>
