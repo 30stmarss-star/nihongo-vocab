@@ -32,9 +32,7 @@ export function WordTable(props: Props) {
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
       {/* 헤더 */}
       <div className="flex items-center border-b border-white/10 px-3 py-3 text-xs font-medium tracking-wide text-neutral-400">
-        <div className={`${ko ? "w-[44%]" : "w-[34%]"} shrink-0`}>
-          {ko ? "뜻" : "단어"}
-        </div>
+        <div className="w-[40%] shrink-0">{ko ? "뜻" : "단어"}</div>
         <div className="grid flex-1 grid-cols-2 gap-2">
           <span>{ko ? "단어" : "독음(히라가나)"}</span>
           <span>{ko ? "독음(히라가나)" : "뜻"}</span>
@@ -138,17 +136,11 @@ function WordRow({
       {/* 왼쪽 고정폭 칸(정렬 유지). 빈 공간은 오버레이로 통과(pointer-events-none),
           글자만 위(z-20)로 빼서 누르면 상세 카드가 뜬다. */}
       <div
-        className={[
-          "no-select pointer-events-none relative flex shrink-0 items-stretch",
-          ko ? "w-[44%] pr-2" : "w-[34%]",
-        ].join(" ")}
+        className="no-select pointer-events-none relative flex w-[40%] shrink-0 items-stretch pr-2"
       >
         <button
           type="button"
-          className={[
-            "no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left text-white",
-            ko ? "text-sm leading-snug sm:text-base" : "text-base sm:text-lg",
-          ].join(" ")}
+          className="no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left text-base leading-snug text-white sm:text-lg"
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
         >
