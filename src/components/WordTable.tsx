@@ -179,7 +179,7 @@ function WordRow({
             onClick={toggle}
             onContextMenu={(e) => e.preventDefault()}
             style={{ touchAction: "manipulation" }}
-            className="group no-select grid h-full w-full cursor-pointer place-items-center transition active:scale-95"
+            className="group no-select flex h-full w-full cursor-pointer items-center justify-end pr-1 transition active:scale-95"
           >
             <span
               className={[
