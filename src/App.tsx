@@ -28,9 +28,10 @@ import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
 import { Quiz, type QuizResult } from "./components/Quiz";
+import { Reference } from "./components/Reference";
 
 
-type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz";
+type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz" | "reference";
 
 const HINT_KEY = "hint.longpress.v1";
 type Phase = "loading" | "login" | "ready";
@@ -390,6 +391,13 @@ export default function App() {
                 >
                   닮은꼴 한자
                 </button>
+                <button
+                  role="menuitem"
+                  onClick={() => go("reference")}
+                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
+                >
+                  특수 암기 📒
+                </button>
                 {CLOUD && userId && (
                   <button
                     role="menuitem"
@@ -463,7 +471,11 @@ export default function App() {
         )}
       </div>
 
-      {(view === "kanji" || view === "tutor" || view === "account" || view === "quiz") && (
+      {(view === "kanji" ||
+        view === "tutor" ||
+        view === "account" ||
+        view === "quiz" ||
+        view === "reference") && (
         <button
           onClick={() => setView("study")}
           className="mb-3 -mt-1 text-sm text-neutral-400 transition hover:text-neutral-200"
@@ -490,6 +502,8 @@ export default function App() {
           onApplyResults={applyQuizResults}
           onClose={() => setView("study")}
         />
+      ) : view === "reference" ? (
+        <Reference />
       ) : view === "kanji" ? (
         <ConfusableCards userId={userId} />
       ) : view === "study" ? (
