@@ -194,42 +194,61 @@ export function buildWorksheet(
   const boost = (w: Word) =>
     scan && scan.has(w.id) && !isKnown(progress[w.id]) ? SCAN_BOOST : 1;
 
-  const seen: Word[] = [];
+  // 풀을 셋으로: 새 단어(fresh) / 학습 중(learning: 봤지만 아직 못 외움) / 외운 것(known)
   const fresh: Word[] = [];
+  const learning: Word[] = [];
+  const known: Word[] = [];
   for (const w of pool) {
     const p = progress[w.id];
-    if (isRetired(p)) continue; // 왕체크(완전 암기) → 학습지에서 완전히 제외
-    if (p && p.seenCount > 0) seen.push(w);
-    else fresh.push(w);
+    if (isRetired(p)) continue; // 왕체크(완전 암기) → 완전히 제외
+    if (!p || p.seenCount === 0) fresh.push(w);
+    else if (isKnown(p)) known.push(w);
+    else learning.push(w);
   }
 
-  // 아직 안 외운(복습 대기) 단어가 많이 밀리면 새 단어 도입을 줄여 먼저 따라잡게 함
-  const backlog = seen.filter((w) => !isKnown(progress[w.id])).length;
+  // 아직 못 외운 게 많이 밀리면 새 단어 도입을 줄여 먼저 따라잡게 함
   const newCap =
-    backlog >= BACKLOG_HARD ? 1 : backlog >= BACKLOG_SOFT ? 3 : NEW_PER_SHEET;
+    learning.length >= BACKLOG_HARD ? 1 : learning.length >= BACKLOG_SOFT ? 3 : NEW_PER_SHEET;
 
-  // 새 단어: 중요도·스캔 보정을 곱한 가중치로 무작위 추출
+  // 새 단어: 중요도·스캔 보정 가중치로 추출
   const freshWeight = (w: Word) => NEW_WEIGHT * importanceFactor(w.freq) * boost(w);
-  const newCount = Math.min(newCap, fresh.length, count);
-  const newPicks = weightedSampleBy(fresh, newCount, rand, freshWeight);
+  const newPicks = weightedSampleBy(
+    fresh,
+    Math.min(newCap, fresh.length, count),
+    rand,
+    freshWeight
+  );
 
-  // 복습: 만기 가중치 × 중요도 × 스캔 보정
+  // 복습 풀 = 학습 중 단어(항상) + 외운 단어 중 '복습 시점이 된' 것만.
+  //  → 아직 복습 때가 아닌 외운 단어는 새어들지 않아, 매번 외운 단어가 우르르 나오지 않고
+  //    비율도 안정된다. (외운 단어는 자기 간격이 지나야 복습으로 등장)
   const reviewWeight = (w: Word) =>
     weightFor(progress[w.id], now) * importanceFactor(w.freq) * boost(w);
-  const reviewPicks = weightedSampleBy(seen, count - newPicks.length, rand, reviewWeight);
+  const dueKnown = known.filter((w) => weightFor(progress[w.id], now) > FLOOR_WEIGHT);
+  const reviewPool = [...learning, ...dueKnown];
+  const reviewPicks = weightedSampleBy(reviewPool, count - newPicks.length, rand, reviewWeight);
 
-  // 그래도 칸이 남으면(초기: 복습 풀이 작음) 남은 새 단어로 채움
-  const used = new Set(newPicks.map((w) => w.id));
-  const shortfall = count - newPicks.length - reviewPicks.length;
-  const extra =
-    shortfall > 0
-      ? weightedSampleBy(
-          fresh.filter((w) => !used.has(w.id)),
-          shortfall,
-          rand,
-          freshWeight
-        )
-      : [];
+  // 칸이 남으면 ① 남은 새 단어로, ② 그래도 남으면 '최후'로 복습 때 아닌 외운 단어로 채움
+  const used = new Set([...newPicks, ...reviewPicks].map((w) => w.id));
+  const extra: Word[] = [];
+  let shortfall = count - newPicks.length - reviewPicks.length;
+  if (shortfall > 0) {
+    const more = weightedSampleBy(
+      fresh.filter((w) => !used.has(w.id)),
+      shortfall,
+      rand,
+      freshWeight
+    );
+    more.forEach((w) => used.add(w.id));
+    extra.push(...more);
+    shortfall -= more.length;
+  }
+  if (shortfall > 0) {
+    const resting = known.filter((w) => !used.has(w.id));
+    extra.push(
+      ...weightedSampleBy(resting, shortfall, rand, (w) => importanceFactor(w.freq))
+    );
+  }
 
   return shuffle([...newPicks, ...reviewPicks, ...extra], rand);
 }
