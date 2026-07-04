@@ -2,6 +2,7 @@ import { useMemo, useRef, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
 import { weightFor, type ProgressMap } from "../lib/srs";
+import { readingMatches } from "../lib/kana";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -76,23 +77,27 @@ function weightedPick(words: Word[], count: number, progress: ProgressMap): Word
   return out;
 }
 
-// 가타카나→히라가나 + 공백/기호 제거 (타이핑 채점 관용)
-const norm = (s: string) =>
-  s
-    .trim()
-    .replace(/\s+/g, "")
-    .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60));
-
+/**
+ * 오답 보기 생성. 헷갈리게: **같은 품사 → 같은 레벨**을 우선해 뜻만 보고 소거하지 못하게.
+ * (같은 품사 뜻이 부족하면 같은 레벨 → 아무거나로 보충)
+ */
 function meaningChoices(word: Word, band: Word[]): { choices: string[]; answer: number } {
-  const others = shuffle(
-    band.filter((w) => w.id !== word.id && w.meaning !== word.meaning)
-  );
-  // 같은 레벨 우선으로 3개
-  const sameLv = others.filter((w) => w.level === word.level);
-  const picks = [...sameLv, ...others]
-    .filter((w, i, arr) => arr.findIndex((x) => x.meaning === w.meaning) === i)
-    .slice(0, 3)
-    .map((w) => w.meaning);
+  const usable = band.filter((w) => w.id !== word.id && w.meaning !== word.meaning);
+  const samePos = usable.filter((w) => w.type.kind === word.type.kind);
+  const rank = [
+    ...shuffle(samePos.filter((w) => w.level === word.level)),
+    ...shuffle(samePos),
+    ...shuffle(usable.filter((w) => w.level === word.level)),
+    ...shuffle(usable),
+  ];
+  const picks: string[] = [];
+  const seen = new Set([word.meaning]);
+  for (const w of rank) {
+    if (seen.has(w.meaning)) continue;
+    seen.add(w.meaning);
+    picks.push(w.meaning);
+    if (picks.length === 3) break;
+  }
   const all = shuffle([word.meaning, ...picks]);
   return { choices: all, answer: all.indexOf(word.meaning) };
 }
@@ -201,10 +206,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
       const a = answers[i];
       let ok = false;
       if (q.kind === "type") {
-        const v = typeof a === "string" ? a : "";
-        ok =
-          !!v &&
-          (norm(v) === norm(q.word.kana) || norm(v) === norm(q.word.kanji));
+        ok = readingMatches(typeof a === "string" ? a : "", q.word.kana, q.word.kanji);
       } else {
         ok = a === q.answer;
       }
@@ -438,7 +440,9 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
 
         {q.kind === "type" && (
           <>
-            <div className="text-xs text-neutral-500">뜻을 보고 독음(히라가나)을 입력</div>
+            <div className="text-xs text-neutral-500">
+              뜻을 보고 독음 입력 <span className="text-neutral-600">(히라가나·한국어 독음 모두 인정)</span>
+            </div>
             <div className="mt-1 text-2xl font-semibold text-white">{q.word.meaning}</div>
             <input
               value={typeof sel === "string" ? sel : ""}
@@ -449,7 +453,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
               inputMode="text"
               autoComplete="off"
               autoCapitalize="off"
-              placeholder="ひらがな"
+              placeholder="예: にる 또는 니루"
               className="mt-4 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-lg text-white outline-none focus:border-emerald-400/60"
             />
           </>
