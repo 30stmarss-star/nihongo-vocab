@@ -27,10 +27,11 @@ import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
+import { Quiz, type QuizResult } from "./components/Quiz";
 
 const SIZE_OPTIONS = [10, 15, 20, 30];
 
-type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account";
+type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz";
 
 const HINT_KEY = "hint.longpress.v1";
 type Phase = "loading" | "login" | "ready";
@@ -238,6 +239,22 @@ export default function App() {
     });
   }
 
+  /** 시험 결과 일괄 반영: 맞힌 단어는 숙련도↑, 틀린 단어는 복습으로(숙련도 리셋). */
+  function applyQuizResults(results: QuizResult[]) {
+    setProgress((prev) => {
+      const now = Date.now();
+      const next = { ...prev };
+      const changed: string[] = [];
+      for (const r of results) {
+        const p = next[r.id] ?? defaultProgress();
+        next[r.id] = r.correct ? markKnown(p, now) : markUnknown(p, now);
+        changed.push(r.id);
+      }
+      if (changed.length) persistProgress(userId, next, changed);
+      return next;
+    });
+  }
+
   const learnedWords = useMemo(() => {
     if (!band) return [];
     const list = poolFor(band).filter((w) => isKnown(progress[w.id]));
@@ -370,6 +387,13 @@ export default function App() {
               >
                 <button
                   role="menuitem"
+                  onClick={() => go("quiz")}
+                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
+                >
+                  단어 시험 📝
+                </button>
+                <button
+                  role="menuitem"
                   onClick={() => go("kanji")}
                   className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
                 >
@@ -448,7 +472,7 @@ export default function App() {
         )}
       </div>
 
-      {(view === "kanji" || view === "tutor" || view === "account") && (
+      {(view === "kanji" || view === "tutor" || view === "account" || view === "quiz") && (
         <button
           onClick={() => setView("study")}
           className="mb-3 -mt-1 text-sm text-neutral-400 transition hover:text-neutral-200"
@@ -463,6 +487,18 @@ export default function App() {
         <ScanCapture onSaved={onScanSaved} />
       ) : view === "tutor" ? (
         <Chat />
+      ) : view === "quiz" ? (
+        <Quiz
+          pool={
+            band
+              ? poolFor(band).filter((w) => (progress[w.id]?.seenCount ?? 0) > 0)
+              : []
+          }
+          bandWords={band ? poolFor(band) : []}
+          progress={progress}
+          onApplyResults={applyQuizResults}
+          onClose={() => setView("study")}
+        />
       ) : view === "kanji" ? (
         <ConfusableCards userId={userId} />
       ) : view === "study" ? (
