@@ -520,9 +520,8 @@ export default function App() {
         <>
           <div className="mb-3 flex items-center gap-2">
             <p className="text-xs text-neutral-500">
-              {learnedReverse
-                ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
-                : "외운 단어예요. 체크를 누르면 제자리에서 금색(완전 암기·학습지 제외)으로, 한 번 더 누르면 해제(빈 원)로 바뀌어요. 금색 모으기·해제된 단어 정리는 탭을 다시 열 때 이뤄져요."}
+              외운 단어예요. 꾹 누르면 정답이 보이고, 체크는 금색(완전 암기)→해제
+              순으로 바뀌어요.
             </p>
             <button
               onClick={() => setLearnedReverse((v) => !v)}
