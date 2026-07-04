@@ -250,59 +250,30 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [band, progress, words]);
 
-  // 외운 단어 뷰의 실제 표시 목록.
-  //  - 뷰에 '처음 들어올 때'만 왕체크를 하단으로 모아 정렬(스냅샷).
-  //  - 뷰 안에서 체크를 바꿔도 재정렬하지 않고 제자리 유지 → 금색 전환이 그 자리에서 보이고,
-  //    "완전 암기(금색)"와 "해제(삭제)"가 구분된다.
-  //  - 체크를 풀면(외운 목록에서 빠지면) ~3초 뒤 제거(되돌릴 여유).
+  // 외운 단어 뷰의 실제 표시 목록. 왕체크·해제 모두 '세션 스냅샷' 방식으로 동일하게 동작:
+  //  - 뷰에 '처음 들어올 때'만 목록을 다시 계산(왕체크는 하단 정렬, 해제된 건 빠짐).
+  //  - 뷰 안에서 체크를 바꿔도 재정렬·삭제하지 않고 제자리 유지 → 금색 전환도, 해제(빈 원)도
+  //    그 자리에서 보여 구분되고, 실제 정리는 탭을 다시 열 때 일어난다.
   const [learnedDisplay, setLearnedDisplay] = useState<Word[]>([]);
-  const lingerTimers = useRef<Map<string, number>>(new Map());
   const prevViewRef = useRef<View>(view);
 
   useEffect(() => {
     const wasLearned = prevViewRef.current === "learned";
     prevViewRef.current = view;
+    if (view !== "learned") return;
 
-    if (view !== "learned") {
-      for (const t of lingerTimers.current.values()) window.clearTimeout(t);
-      lingerTimers.current.clear();
-      return;
-    }
-
-    // 처음 진입: 정렬 스냅샷(왕체크 하단). learnedWords는 이미 그 순서로 정렬돼 있다.
+    // 처음 진입: 정렬 스냅샷(왕체크 하단, 해제된 건 제외). learnedWords가 이미 그 순서.
     if (!wasLearned) {
-      for (const t of lingerTimers.current.values()) window.clearTimeout(t);
-      lingerTimers.current.clear();
       setLearnedDisplay(learnedWords);
       return;
     }
 
-    // 진입 후 progress 변경: 재정렬 없이 제자리 유지 + 지연 삭제만.
-    const trueIds = new Set(learnedWords.map((w) => w.id));
-    const byId = new Map(learnedWords.map((w) => [w.id, w]));
-    // 다시 체크돼 되살아난 단어는 제거 예약 취소.
-    for (const [id, t] of lingerTimers.current) {
-      if (trueIds.has(id)) {
-        window.clearTimeout(t);
-        lingerTimers.current.delete(id);
-      }
-    }
+    // 진입 후 progress 변경: 순서·구성 그대로 유지. 새로 외운 단어만 뒤에 추가.
+    // (해제·왕체크는 제자리에서 색만 바뀌고, 목록에서 빼지 않는다.)
     setLearnedDisplay((prev) => {
-      // 외운 목록에서 빠진 단어는 3초 뒤 제거 예약(그동안 제자리에 남겨 되돌릴 여유).
-      prev.forEach((w) => {
-        if (!trueIds.has(w.id) && !lingerTimers.current.has(w.id)) {
-          const t = window.setTimeout(() => {
-            lingerTimers.current.delete(w.id);
-            setLearnedDisplay((cur) => cur.filter((x) => x.id !== w.id));
-          }, 3000);
-          lingerTimers.current.set(w.id, t);
-        }
-      });
-      // 순서 그대로 유지, 데이터만 최신화(사라지는 중이면 옛 객체 보존). 신규 외운 단어는 뒤에 추가.
       const shown = new Set(prev.map((w) => w.id));
-      const next = prev.map((w) => byId.get(w.id) ?? w);
-      for (const w of learnedWords) if (!shown.has(w.id)) next.push(w);
-      return next;
+      const additions = learnedWords.filter((w) => !shown.has(w.id));
+      return additions.length ? [...prev, ...additions] : prev;
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [learnedWords, view]);
@@ -538,7 +509,7 @@ export default function App() {
             onRetire={(id) => update(id, markRetired)}
           />
         </>
-      ) : learnedWords.length === 0 ? (
+      ) : learnedDisplay.length === 0 ? (
         <div className="rounded-2xl border border-white/10 bg-neutral-950/60 px-6 py-12 text-center text-sm text-neutral-500">
           아직 외운 단어가 없어요.
           <br />
@@ -551,7 +522,7 @@ export default function App() {
             <p className="text-xs text-neutral-500">
               {learnedReverse
                 ? "뜻을 보고 단어를 떠올려 보세요. 오른쪽을 꾹 누르면 정답이 보여요."
-                : "외운 단어예요. 체크를 누르면 제자리에서 금색(완전 암기·학습지 제외)으로 변하고, 한 번 더 누르면 해제돼 잠시 뒤 사라져요. 금색은 다시 열 때 아래로 모여요."}
+                : "외운 단어예요. 체크를 누르면 제자리에서 금색(완전 암기·학습지 제외)으로, 한 번 더 누르면 해제(빈 원)로 바뀌어요. 금색 모으기·해제된 단어 정리는 탭을 다시 열 때 이뤄져요."}
             </p>
             <button
               onClick={() => setLearnedReverse((v) => !v)}
