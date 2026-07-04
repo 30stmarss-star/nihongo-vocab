@@ -25,7 +25,7 @@ const DAY = 24 * 60 * 60 * 1000;
  * mastery 0(아직 못 외움)도 0이 아니라 살짝 쉬게 해서, 한 번 나온 뒤
  * 바로 다음 학습지에 또 나오지 않고 "좀 있다가" 돌아오게 한다.
  */
-const INTERVALS_DAYS = [0.2, 1, 3, 7, 16, 35];
+const INTERVALS_DAYS = [0.4, 1, 3, 7, 16, 35];
 
 /** 한 번도 안 본 단어의 기본 가중치 */
 const NEW_WEIGHT = 1.2;
@@ -97,7 +97,9 @@ export function weightFor(p: Progress | undefined, now: number): number {
   if (elapsed >= interval) {
     // 복습 시점 도달: 기본 가중치는 숙련도가 높을수록 낮고,
     // 복습 시점을 많이 넘겼을수록 조금씩 더 올라간다.
-    const base = Math.max(0.35, 1.2 - mastery * 0.17);
+    // 못 외운(mastery 0) 단어도 새 단어(NEW_WEIGHT 1.2)보다는 한 단계 아래(0.9)에서 시작 —
+    // 복습은 하되 새 단어를 밀어내며 반복 도배되지 않게.
+    const base = Math.max(0.35, 0.9 - mastery * 0.11);
     const overdue = interval <= 0 ? 1 : Math.min(elapsed / interval, 3);
     return base * (0.8 + 0.2 * overdue);
   }
