@@ -37,7 +37,7 @@ export function WordTable(props: Props) {
           <span>{ko ? "단어" : "독음(히라가나)"}</span>
           <span>{ko ? "독음(히라가나)" : "뜻"}</span>
         </div>
-        <div className="w-[76px] shrink-0 text-center">암기</div>
+        <div className="w-12 shrink-0 text-center">암기</div>
       </div>
 
       <ul>
@@ -47,6 +47,12 @@ export function WordTable(props: Props) {
       </ul>
     </div>
   );
+}
+
+/** 뜻→단어 모드의 문제(한국어 뜻)에서 괄호 보충설명을 뗀다. 상세 카드에는 그대로 남는다. */
+function stripParens(text: string): string {
+  const bare = text.replace(/\s*[（(][^）)]*[）)]/g, "").trim();
+  return bare || text;
 }
 
 function WordRow({
@@ -102,7 +108,7 @@ function WordRow({
   const jpKana = pre + word.kana;
 
   // 보이는 칸(왼쪽)과 가려진 칸(오른쪽)을 모드에 따라 바꾼다.
-  const promptText = ko ? word.meaning : jpKanji;
+  const promptText = ko ? stripParens(word.meaning) : jpKanji;
   const maskedLeft = ko ? jpKanji : jpKana; // 가려진 첫 칸
   const maskedRight = ko ? jpKana : word.meaning; // 가려진 둘째 칸
 
@@ -161,9 +167,10 @@ function WordRow({
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
 
-        {/* 암기 체크: 탭 영역을 넓혀(폭 76px·행 전체 높이) 체크 왼쪽 빈 곳을 눌러도 반응.
-            보이는 체크 원은 작게. 없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
-        <div className="no-select relative z-20 flex w-[76px] shrink-0 items-stretch">
+        {/* 암기 체크: 탭 영역(폭 48px·행 전체 높이)을 보이는 원 크기에 맞춰
+            빈 곳처럼 보이는 데를 눌렀을 때 체크가 토글되지 않게 한다.
+            없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
+        <div className="no-select relative z-20 flex w-12 shrink-0 items-stretch">
           <button
             type="button"
             aria-label={
@@ -200,7 +207,7 @@ function WordRow({
       {flash && (
         <span
           className={[
-            "pointer-events-none absolute right-16 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
+            "pointer-events-none absolute right-10 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
             flashKind === "retired" ? "text-amber-300" : "text-emerald-400",
           ].join(" ")}
         >
@@ -225,7 +232,7 @@ function MaskedCell({
     <span className="relative block">
       <span
         className={[
-          "line-clamp-2 [overflow-wrap:anywhere] block text-sm transition-opacity duration-200 sm:text-base",
+          "block [overflow-wrap:anywhere] text-sm transition-opacity duration-200 sm:text-base",
           revealed ? "opacity-100" : "opacity-0",
           className,
         ].join(" ")}
