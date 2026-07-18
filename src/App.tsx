@@ -29,6 +29,7 @@ import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
+import { BUILD_ID, forceUpdate } from "./lib/version";
 
 
 type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz" | "reference";
@@ -48,6 +49,8 @@ export default function App() {
   const [view, setView] = useState<View>("study");
   // 보조 기능(닮은꼴·튜터·계정) 더보기 메뉴 열림 상태
   const [menuOpen, setMenuOpen] = useState(false);
+  // '새 버전 받기' 진행 중 표시
+  const [updating, setUpdating] = useState(false);
   // 학습지 사용법 안내: 첫 접속 때 1회만 팝업
   const [showHint, setShowHint] = useState(() => {
     try {
@@ -429,6 +432,22 @@ export default function App() {
                     </button>
                   </>
                 )}
+                {/* 새 버전 받기: iOS PWA는 새로고침 수단이 없어 여기서 강제 업데이트 */}
+                <div className="my-1 h-px bg-white/10" />
+                <button
+                  role="menuitem"
+                  disabled={updating}
+                  onClick={() => {
+                    setUpdating(true);
+                    void forceUpdate();
+                  }}
+                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5 disabled:opacity-60"
+                >
+                  {updating ? "새 버전 확인 중…" : "🔄 새 버전 받기"}
+                </button>
+                <div className="px-4 pb-1.5 pt-0.5 text-[11px] text-neutral-500">
+                  버전 {BUILD_ID}
+                </div>
               </div>
             </>
           )}

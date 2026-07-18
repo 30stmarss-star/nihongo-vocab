@@ -32,12 +32,12 @@ export function WordTable(props: Props) {
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
       {/* 헤더 */}
       <div className="flex items-center border-b border-white/10 px-3 py-3 text-xs font-medium tracking-wide text-neutral-400">
-        <div className="w-[34%] shrink-0">{ko ? "뜻" : "단어"}</div>
+        <div className="w-11 shrink-0 text-center">암기</div>
+        <div className="w-[34%] shrink-0 pl-1">{ko ? "뜻" : "단어"}</div>
         <div className="grid flex-1 grid-cols-2 gap-2">
           <span>{ko ? "단어" : "독음(히라가나)"}</span>
           <span>{ko ? "독음(히라가나)" : "뜻"}</span>
         </div>
-        <div className="w-12 shrink-0 text-center">암기</div>
       </div>
 
       <ul>
@@ -139,10 +139,40 @@ function WordRow({
         flash ? (flashKind === "retired" ? "bg-amber-400/15" : "bg-emerald-500/15") : "",
       ].join(" ")}
     >
-      {/* 왼쪽 고정폭 칸(정렬 유지). 빈 공간은 오버레이로 통과(pointer-events-none),
+      {/* 암기 체크: 행 맨 왼쪽. 오른쪽 화면 가장자리를 눌러도 체크가 토글되지 않게
+          아예 반대편으로 옮겼다. 없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
+      <div className="no-select relative z-20 flex w-11 shrink-0 items-stretch">
+        <button
+          type="button"
+          aria-label={
+            retired ? "완전 암기 해제" : known ? "완전 암기로 표시" : "암기 완료"
+          }
+          aria-pressed={known || retired}
+          draggable={false}
+          onClick={toggle}
+          onContextMenu={(e) => e.preventDefault()}
+          style={{ touchAction: "manipulation" }}
+          className="group no-select flex h-full w-full cursor-pointer items-center justify-center transition active:scale-95"
+        >
+          <span
+            className={[
+              "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
+              retired
+                ? "bg-amber-400 text-amber-950 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)] ring-2 ring-amber-300/70"
+                : known
+                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
+                  : "border border-white/25 text-transparent group-hover:border-emerald-400/70",
+            ].join(" ")}
+          >
+            ✓
+          </span>
+        </button>
+      </div>
+
+      {/* 문제 칸(고정폭, 정렬 유지). 빈 공간은 오버레이로 통과(pointer-events-none),
           글자만 위(z-20)로 빼서 누르면 상세 카드가 뜬다. */}
       <div
-        className="no-select pointer-events-none relative flex w-[34%] shrink-0 items-stretch pr-2"
+        className="no-select pointer-events-none relative flex w-[34%] shrink-0 items-stretch pl-1 pr-2"
       >
         <button
           type="button"
@@ -159,43 +189,12 @@ function WordRow({
         </button>
       </div>
 
-      {/* 오른쪽: 가림 셀(그대로) + 체크. 가림 셀은 오버레이 아래에 있어 눌러도 오버레이가 공개를 처리.
-          체크(✓)만 위(z-20)로 빼서 암기 표시를 담당한다. */}
+      {/* 오른쪽: 가림 셀만. 오버레이 아래에 있어 누르면 꾹 눌러 공개로 동작하고,
+          화면 오른쪽 가장자리 어디를 눌러도 체크와 무관하다. */}
       <div className="relative flex flex-1 items-center py-2.5">
         <div className="grid flex-1 grid-cols-2 gap-2 sm:gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
-        </div>
-
-        {/* 암기 체크: 탭 영역(폭 48px·행 전체 높이)을 보이는 원 크기에 맞춰
-            빈 곳처럼 보이는 데를 눌렀을 때 체크가 토글되지 않게 한다.
-            없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
-        <div className="no-select relative z-20 flex w-12 shrink-0 items-stretch">
-          <button
-            type="button"
-            aria-label={
-              retired ? "완전 암기 해제" : known ? "완전 암기로 표시" : "암기 완료"
-            }
-            aria-pressed={known || retired}
-            draggable={false}
-            onClick={toggle}
-            onContextMenu={(e) => e.preventDefault()}
-            style={{ touchAction: "manipulation" }}
-            className="group no-select flex h-full w-full cursor-pointer items-center justify-center transition active:scale-95"
-          >
-            <span
-              className={[
-                "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
-                retired
-                  ? "bg-amber-400 text-amber-950 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)] ring-2 ring-amber-300/70"
-                  : known
-                    ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-                    : "border border-white/25 text-transparent group-hover:border-emerald-400/70",
-              ].join(" ")}
-            >
-              ✓
-            </span>
-          </button>
         </div>
       </div>
 
@@ -207,7 +206,7 @@ function WordRow({
       {flash && (
         <span
           className={[
-            "pointer-events-none absolute right-10 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
+            "pointer-events-none absolute left-12 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
             flashKind === "retired" ? "text-amber-300" : "text-emerald-400",
           ].join(" ")}
         >
