@@ -32,7 +32,7 @@ export function WordTable(props: Props) {
     <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
       {/* 헤더 */}
       <div className="flex items-center border-b border-white/10 px-3 py-3 text-xs font-medium tracking-wide text-neutral-400">
-        <div className="w-[40%] shrink-0">{ko ? "뜻" : "단어"}</div>
+        <div className="w-[34%] shrink-0">{ko ? "뜻" : "단어"}</div>
         <div className="grid flex-1 grid-cols-2 gap-2">
           <span>{ko ? "단어" : "독음(히라가나)"}</span>
           <span>{ko ? "독음(히라가나)" : "뜻"}</span>
@@ -136,15 +136,18 @@ function WordRow({
       {/* 왼쪽 고정폭 칸(정렬 유지). 빈 공간은 오버레이로 통과(pointer-events-none),
           글자만 위(z-20)로 빼서 누르면 상세 카드가 뜬다. */}
       <div
-        className="no-select pointer-events-none relative flex w-[40%] shrink-0 items-stretch pr-2"
+        className="no-select pointer-events-none relative flex w-[34%] shrink-0 items-stretch pr-2"
       >
         <button
           type="button"
-          className="no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left text-base leading-snug text-white sm:text-lg"
+          className={[
+            "no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left leading-snug text-white",
+            ko ? "text-sm sm:text-base" : "text-base sm:text-lg",
+          ].join(" ")}
           onContextMenu={(e) => e.preventDefault()}
           onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
         >
-          <span className={ko ? "line-clamp-2 [overflow-wrap:anywhere]" : "truncate"}>
+          <span className="line-clamp-2 [overflow-wrap:anywhere]">
             {promptText}
           </span>
         </button>
@@ -153,7 +156,7 @@ function WordRow({
       {/* 오른쪽: 가림 셀(그대로) + 체크. 가림 셀은 오버레이 아래에 있어 눌러도 오버레이가 공개를 처리.
           체크(✓)만 위(z-20)로 빼서 암기 표시를 담당한다. */}
       <div className="relative flex flex-1 items-center py-2.5">
-        <div className="grid flex-1 grid-cols-2 gap-4">
+        <div className="grid flex-1 grid-cols-2 gap-2 sm:gap-4">
           <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
           <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
         </div>
@@ -171,11 +174,11 @@ function WordRow({
             onClick={toggle}
             onContextMenu={(e) => e.preventDefault()}
             style={{ touchAction: "manipulation" }}
-            className="group no-select flex h-full w-full cursor-pointer items-center justify-end pr-1 transition active:scale-95"
+            className="group no-select flex h-full w-full cursor-pointer items-center justify-center transition active:scale-95"
           >
             <span
               className={[
-                "grid h-6 w-6 place-items-center rounded-full text-xs font-bold transition",
+                "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
                 retired
                   ? "bg-amber-400 text-amber-950 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)] ring-2 ring-amber-300/70"
                   : known
@@ -222,7 +225,7 @@ function MaskedCell({
     <span className="relative block">
       <span
         className={[
-          "block truncate text-sm transition-opacity duration-200 sm:text-base",
+          "line-clamp-2 [overflow-wrap:anywhere] block text-sm transition-opacity duration-200 sm:text-base",
           revealed ? "opacity-100" : "opacity-0",
           className,
         ].join(" ")}
