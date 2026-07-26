@@ -16,6 +16,7 @@ import {
 } from "../lib/quizgen";
 import type { QuizResult } from "./Quiz";
 import { scanWords } from "./JpText";
+import { ExampleLine } from "./ExampleLine";
 
 /**
  * 데일리 시험 — 오늘의 단어를 여러 각도에서 묻는다.
@@ -42,6 +43,7 @@ interface Props {
   onApplyResults: (results: QuizResult[]) => void; // 1차 결과만 SRS 반영
   onPassed: (score: number) => void;
   onExit: () => void;
+  onShowCard: (word: Word, x: number, y: number) => void; // 해설의 단어 탭 → 카드
 }
 
 /** 이 단어를 아직 어려워하는가 (어려움 = 문항 2개) */
@@ -112,6 +114,7 @@ export function DailyTest({
   onApplyResults,
   onPassed,
   onExit,
+  onShowCard,
 }: Props) {
   // 이번 시험에 실제로 출제되는 단어 (오늘 것 일부 + 예전 것 조금)
   const examWords = useMemo(
@@ -409,21 +412,30 @@ export function DailyTest({
             <div className={["text-base font-extrabold", judged.ok ? "text-mint" : "text-coral"].join(" ")}>
               {judged.ok ? "정답! ⭕" : "틀렸어요 ✕"}
             </div>
-            <div className="mt-1.5 text-sm text-ink">
+            <button
+              type="button"
+              onClick={(e) => onShowCard(q.word, e.clientX, e.clientY)}
+              className="mt-1.5 block text-left text-sm text-ink"
+            >
               <b>{headword(q.word)}</b>
               {q.word.kanji !== q.word.kana && <span className="ml-2 text-pri-deep">{q.word.kana}</span>}
               <span className="ml-2 text-sub">{q.word.meaning}</span>
-            </div>
+            </button>
             {"ko" in q && q.ko && <div className="mt-1 text-xs text-sub">{q.ko}</div>}
             {q.kind === "conjugate" && (
               <div className="mt-1 text-xs text-sub">
                 {q.label} — {q.hint}
               </div>
             )}
-            {/* 지문 속 단어 풀이 + 다른 보기들이 무슨 단어였는지 */}
-            <SentenceGlossary q={q} dictionary={bandWords} />
+            {/* 지문 속 단어 풀이 + 다른 보기들이 무슨 단어였는지 (전부 탭하면 카드) */}
+            <SentenceGlossary q={q} dictionary={bandWords} onShowCard={onShowCard} />
             {q.kind !== "type" && (
-              <ChoiceGlossary q={q} picked={judged.picked} dictionary={bandWords} />
+              <ChoiceGlossary
+                q={q}
+                picked={judged.picked}
+                dictionary={bandWords}
+                onShowCard={onShowCard}
+              />
             )}
           </div>
         )}
@@ -463,7 +475,15 @@ export function DailyTest({
  * 문장형 문제 해설 — 지문에 나온 단어들의 독음·뜻을 정리해 준다.
  * 정답을 맞혀도 문장을 통째로 이해 못 하고 넘어가는 걸 막는다.
  */
-function SentenceGlossary({ q, dictionary }: { q: Question; dictionary: Word[] }) {
+function SentenceGlossary({
+  q,
+  dictionary,
+  onShowCard,
+}: {
+  q: Question;
+  dictionary: Word[];
+  onShowCard: (word: Word, x: number, y: number) => void;
+}) {
   // 빈칸 문제는 정답을 채워 완성된 문장으로 보여준다
   const sentence =
     q.kind === "cloze"
@@ -492,19 +512,46 @@ function SentenceGlossary({ q, dictionary }: { q: Question; dictionary: Word[] }
   return (
     <div className="mt-3 border-t border-ink/10 pt-2.5">
       <div className="text-[11px] font-bold text-mut">문장 풀이</div>
-      <div className="mt-1 text-sm font-bold leading-relaxed text-ink">{sentence}</div>
-      {words.length > 0 && (
-        <ul className="mt-1.5 space-y-0.5">
-          {words.map((w) => (
-            <li key={w.id} className="flex items-baseline gap-1.5 text-xs">
-              <span className="font-bold text-ink">{w.kanji}</span>
-              {w.kanji !== w.kana && <span className="text-pri-deep">{w.kana}</span>}
-              <span className="text-sub">{w.meaning}</span>
-            </li>
-          ))}
-        </ul>
-      )}
+      {/* 예문과 같은 줄 — 단어를 탭하면 카드, '문장 분해'를 누르면 조사까지 전부 */}
+      <ExampleLine
+        ex={{ jp: sentence.replace(/[【】]/g, ""), kana: "", ko: "" }}
+        dictionary={dictionary}
+        onShowCard={onShowCard}
+      />
+      {words.length > 0 && <WordGloss words={words} onShowCard={onShowCard} />}
     </div>
+  );
+}
+
+/** 단어 목록 — 각 줄을 누르면 카드가 뜬다(사전에 없으면 카드에서 DB에 추가) */
+function WordGloss({
+  words,
+  onShowCard,
+  picked,
+}: {
+  words: Word[];
+  onShowCard: (word: Word, x: number, y: number) => void;
+  picked?: Word;
+}) {
+  return (
+    <ul className="mt-1.5 space-y-0.5">
+      {words.map((w) => (
+        <li key={w.id}>
+          <button
+            type="button"
+            onClick={(e) => onShowCard(w, e.clientX, e.clientY)}
+            className="flex w-full items-baseline gap-1.5 rounded-md py-0.5 text-left text-xs transition active:bg-ink/5"
+          >
+            <span className={["font-bold", w === picked ? "text-coral" : "text-ink"].join(" ")}>
+              {w.kanji}
+            </span>
+            {w.kanji !== w.kana && <span className="text-pri-deep">{w.kana}</span>}
+            <span className="text-sub">{w.meaning}</span>
+            {w === picked && <span className="ml-auto text-[10px] font-bold text-coral">내가 고른 답</span>}
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }
 
@@ -516,10 +563,12 @@ function ChoiceGlossary({
   q,
   picked,
   dictionary,
+  onShowCard,
 }: {
   q: Exclude<Question, { kind: "type" }>;
   picked?: number;
   dictionary: Word[];
+  onShowCard: (word: Word, x: number, y: number) => void;
 }) {
   const index = useMemo(() => {
     const m = new Map<string, Word>();
@@ -534,23 +583,16 @@ function ChoiceGlossary({
   if (q.kind === "usage") return null;
 
   const rows = q.choices
-    .map((c, i) => ({ c, i, w: index.get(c) }))
+    .map((c, i) => ({ i, w: index.get(c) }))
     .filter((r) => r.w && r.i !== q.answer);
   if (!rows.length) return null;
+
+  const pickedWord = picked !== undefined ? index.get(q.choices[picked]) : undefined;
 
   return (
     <div className="mt-3 border-t border-ink/10 pt-2.5">
       <div className="text-[11px] font-bold text-mut">다른 보기</div>
-      <ul className="mt-1 space-y-1">
-        {rows.map(({ c, i, w }) => (
-          <li key={i} className="flex items-baseline gap-1.5 text-xs">
-            <span className={["font-bold", i === picked ? "text-coral" : "text-ink"].join(" ")}>{c}</span>
-            {w!.kanji !== w!.kana && c !== w!.kana && <span className="text-pri-deep">{w!.kana}</span>}
-            <span className="text-sub">{w!.meaning}</span>
-            {i === picked && <span className="ml-auto text-[10px] font-bold text-coral">내가 고른 답</span>}
-          </li>
-        ))}
-      </ul>
+      <WordGloss words={rows.map((r) => r.w!)} picked={pickedWord} onShowCard={onShowCard} />
     </div>
   );
 }

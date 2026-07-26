@@ -71,8 +71,8 @@ export function ExampleLine({
       <div className="text-sm font-medium leading-relaxed text-ink">
         <JpText text={ex.jp} dictionary={dictionary} tokens={tokens} onShowCard={onShowCard} />
       </div>
-      {ex.kana !== ex.jp && <div className="mt-0.5 text-xs text-mut">{ex.kana}</div>}
-      <div className="mt-0.5 text-xs text-sub">{ex.ko}</div>
+      {ex.kana && ex.kana !== ex.jp && <div className="mt-0.5 text-xs text-mut">{ex.kana}</div>}
+      {ex.ko && <div className="mt-0.5 text-xs text-sub">{ex.ko}</div>}
 
       {!tokens && (
         <button

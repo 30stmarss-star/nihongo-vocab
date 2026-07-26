@@ -612,7 +612,11 @@ export default function App() {
           onApplyResults={applyQuizResults}
           onPassed={onTestPassed}
           onExit={() => setView("home")}
+          onShowCard={(word, x, y) =>
+            setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
         />
+        {cardOverlay}
       </main>
     );
   }
