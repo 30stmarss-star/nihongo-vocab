@@ -305,9 +305,12 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, progress, 
             ← 이전
           </button>
           <span className="text-[11px] text-mut">
-            {prevRating
-              ? `${prevAgo} ${prevRating === "hard" ? "어려움" : "쉬움"}으로 골랐어요`
-              : "어려움은 복습에 빨리 돌아와요"}
+            {/* 오늘 이미 고른 카드로 되돌아온 경우: 또 누르면 '한 번 더'가 아니라 '바꾸기'다 */}
+            {prevRating && prevAgo === "오늘"
+              ? "다시 누르면 오늘 선택을 바꿔요"
+              : prevRating
+                ? `${prevAgo} ${prevRating === "hard" ? "어려움" : "쉬움"}으로 골랐어요`
+                : "어려움은 복습에 빨리 돌아와요"}
             {last ? " · 마지막 카드예요" : ""}
           </span>
           <button

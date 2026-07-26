@@ -23,6 +23,8 @@ export interface Progress {
   ratedAt?: number; // 그 선택을 한 시각(epoch ms)
   hardCount?: number;
   easyCount?: number;
+  /** 그 선택을 하기 '직전'의 숙련도. 같은 날 다시 고르면 여기서부터 다시 계산해 이중 반영을 막는다. */
+  prevMastery?: number;
 }
 
 export type ProgressMap = Record<string, Progress>;
@@ -71,6 +73,7 @@ export function markRetired(p: Progress, now: number): Progress {
     mastery: RETIRED_MASTERY,
     lastSeen: now,
     seenCount: p.seenCount + 1,
+    prevMastery: undefined,
   };
 }
 
@@ -81,6 +84,7 @@ export function markUnretire(p: Progress, now: number): Progress {
     mastery: 5,
     lastSeen: now,
     seenCount: p.seenCount + 1,
+    prevMastery: undefined,
   };
 }
 
@@ -141,13 +145,18 @@ export function weightFor(p: Progress | undefined, now: number): number {
   return FLOOR_WEIGHT;
 }
 
-/** 안다 표시 */
+/**
+ * 안다 표시.
+ * prevMastery를 지우는 이유: 시험 채점 등 '내 선택이 아닌' 변화가 끼어들면 그 되감기 지점은
+ * 더 이상 유효하지 않다. applyRating은 이 뒤에 자기 값으로 다시 채운다.
+ */
 export function markKnown(p: Progress, now: number): Progress {
   return {
     ...p,
     mastery: Math.min(5, p.mastery + 1),
     lastSeen: now,
     seenCount: p.seenCount + 1,
+    prevMastery: undefined,
   };
 }
 
@@ -158,22 +167,48 @@ export function markUnknown(p: Progress, now: number): Progress {
     mastery: 0,
     lastSeen: now,
     seenCount: p.seenCount + 1,
+    prevMastery: undefined,
   };
+}
+
+/** KST 날짜 키 "2026-07-26". (daily.ts와 같은 규칙 — 순환 import를 피해 여기서도 계산) */
+function kstDay(ms: number): string {
+  return new Intl.DateTimeFormat("sv-SE", {
+    timeZone: "Asia/Seoul",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(ms);
 }
 
 /**
  * 내가 손으로 고른 어려움/쉬움. 숙련도는 기존과 똑같이 움직이고(쉬움=안다, 어려움=모름),
  * 거기에 "무엇을 몇 번 골랐는지"를 덧붙여 다음에 이 단어를 볼 때 되짚어 볼 수 있게 한다.
  * 시험 채점(자동)은 이 기록을 남기지 않는다 — 내가 누른 것만 남아야 의미가 있다.
+ *
+ * 같은 날 이미 고른 단어를 또 고르면 '고쳐 고르기'로 본다 — 앞의 선택을 되돌린 뒤 새로 적용한다.
+ * (되돌아가서 쉬움을 두 번 누르면 숙련도가 두 단계 올라 복습이 1일→3일 뒤로 밀리던 문제)
  */
 export function applyRating(p: Progress, r: Rating, now: number): Progress {
-  const base = r === "easy" ? markKnown(p, now) : markUnknown(p, now);
+  const redo = !!p.lastRating && !!p.ratedAt && kstDay(p.ratedAt) === kstDay(now);
+
+  // 고쳐 고르기면 앞선 선택 '직전' 상태로 되감고 시작한다.
+  const from: Progress = redo
+    ? { ...p, mastery: p.prevMastery ?? p.mastery, seenCount: Math.max(0, p.seenCount - 1) }
+    : p;
+  const undo = redo ? p.lastRating : undefined;
+
+  const base = r === "easy" ? markKnown(from, now) : markUnknown(from, now);
+  const count = (kind: Rating, prev: number) =>
+    prev - (undo === kind ? 1 : 0) + (r === kind ? 1 : 0);
+
   return {
     ...base,
     lastRating: r,
     ratedAt: now,
-    hardCount: (p.hardCount ?? 0) + (r === "hard" ? 1 : 0),
-    easyCount: (p.easyCount ?? 0) + (r === "easy" ? 1 : 0),
+    prevMastery: from.mastery,
+    hardCount: Math.max(0, count("hard", p.hardCount ?? 0)),
+    easyCount: Math.max(0, count("easy", p.easyCount ?? 0)),
   };
 }
 
