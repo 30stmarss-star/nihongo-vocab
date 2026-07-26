@@ -4,12 +4,13 @@
 // 비밀키: ANTHROPIC_API_KEY (기존 함수들과 공유)
 //
 // 규칙 기반 활용기가 놓치는 형태(사역수동·구어 축약 등)까지 잡기 위한 보강 경로.
-// 요청:  POST { sentence, ko? }
-// 응답:  { tokens: [{ surface, base, kana, meaning, pos, level, note }] }
+// 요청:  POST { sentence, ko? }                      → { tokens: [...] }
+//        POST { sentences: ["...", "..."] }          → { results: [{ sentence, tokens }] }
+//   묶음 요청은 코스 시작 때 오늘 예문을 미리 분석해 두는 용도(호출 수·비용 절감).
 //   surface를 순서대로 이으면 원문과 정확히 같아야 한다(클라이언트가 검증).
 
 const MODEL = "claude-opus-5";
-const MAX_TOKENS = 6000;
+const MAX_TOKENS = 24000; // 묶음 분석(최대 40문장)까지 담을 여유
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -40,7 +41,10 @@ const SYSTEM = `당신은 일본어 문장을 한국인 학습자용으로 분�
 - 독음·뜻을 지어내지 마세요.
 
 ## 출력 — 반드시 JSON 하나만 (앞뒤 다른 텍스트 금지)
-{"tokens":[{"surface":"辞書","base":"辞書","kana":"じしょ","meaning":"사전","pos":"명사","level":"N5","note":""}]}`;
+문장이 하나면:
+{"tokens":[{"surface":"辞書","base":"辞書","kana":"じしょ","meaning":"사전","pos":"명사","level":"N5","note":""}]}
+문장이 여러 개면 받은 순서 그대로:
+{"results":[{"sentence":"(원문 그대로)","tokens":[...]}]}`;
 
 function json(obj: unknown, status = 200): Response {
   return new Response(JSON.stringify(obj), {
@@ -64,11 +68,18 @@ Deno.serve(async (req) => {
     if (!apiKey) return json({ error: "ANTHROPIC_API_KEY 미설정" }, 500);
 
     const body = await req.json().catch(() => ({}));
+    const many: string[] = Array.isArray(body?.sentences)
+      ? body.sentences.filter((s: unknown) => typeof s === "string" && s.trim()).slice(0, 40)
+      : [];
     const sentence = String(body?.sentence ?? "").slice(0, 300);
-    if (!sentence.trim()) return json({ error: "sentence가 필요합니다" }, 400);
+    if (!many.length && !sentence.trim()) return json({ error: "sentence가 필요합니다" }, 400);
     const ko = String(body?.ko ?? "").slice(0, 300);
 
-    const userMsg = `문장: ${sentence}${ko ? `\n한국어 뜻: ${ko}` : ""}\n\n이 문장을 분해해 JSON으로 출력하세요.`;
+    const userMsg = many.length
+      ? `아래 문장들을 각각 분해해 results 배열로, 받은 순서 그대로 출력하세요.\n\n${many
+          .map((s, i) => `${i + 1}. ${s}`)
+          .join("\n")}`
+      : `문장: ${sentence}${ko ? `\n한국어 뜻: ${ko}` : ""}\n\n이 문장을 분해해 JSON으로 출력하세요.`;
 
     const res = await fetch("https://api.anthropic.com/v1/messages", {
       method: "POST",
@@ -80,7 +91,8 @@ Deno.serve(async (req) => {
       body: JSON.stringify({
         model: MODEL,
         max_tokens: MAX_TOKENS,
-        output_config: { effort: "medium" },
+        // 기계적인 분해라 깊게 생각할 필요가 없다 — 비용·지연을 아낀다
+        output_config: { effort: "low" },
         system: SYSTEM,
         messages: [{ role: "user", content: userMsg }],
       }),

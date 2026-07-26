@@ -44,6 +44,7 @@ import {
   type ActivityLog,
   type DailyPlan,
 } from "./lib/daily";
+import { prefetchSentences } from "./lib/sentences";
 import { CLOUD, supabase } from "./lib/supabase";
 import { WordTable } from "./components/WordTable";
 import { WordCard } from "./components/WordCard";
@@ -414,6 +415,22 @@ export default function App() {
         return next;
       });
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, userId, planWords.list.length]);
+
+  // 오늘 카드에 나올 예문을 미리 문맥 분해해 둔다 — 카드를 열자마자
+  // 활용형·조사까지 정확히 쪼개진 상태로 보인다. 캐시에 있는 문장은 건너뛴다.
+  const prefetchReq = useRef<string | null>(null);
+  useEffect(() => {
+    if (!plan || plan.testPassed || !(CLOUD && userId) || !planWords.list.length) return;
+    const key = `${plan.band}.${plan.day}.${plan.newIds[0] ?? ""}`;
+    if (prefetchReq.current === key) return;
+    prefetchReq.current = key;
+    // 카드에는 예문 2개까지 뜬다
+    const sentences = planWords.list.flatMap((w) =>
+      (Array.isArray(w.examples) ? w.examples : []).slice(0, 2).map((ex) => ex.jp)
+    );
+    void prefetchSentences(sentences);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [plan, userId, planWords.list.length]);
 
