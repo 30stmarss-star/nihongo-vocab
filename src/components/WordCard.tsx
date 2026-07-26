@@ -2,8 +2,20 @@ import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
 
-/** 단어를 꾹 누르고 있는 동안 떠 있는 상세 카드. 손/마우스를 떼면 사라진다. */
-export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
+/** 단어 상세 카드. inBook/onAddBook을 주면 '단어장에 넣기' 버튼이 붙는다. */
+export function WordCard({
+  word,
+  x,
+  y,
+  inBook,
+  onAddBook,
+}: {
+  word: Word;
+  x: number;
+  y: number;
+  inBook?: boolean;
+  onAddBook?: () => void;
+}) {
   // 깨진/누락 데이터에도 카드가 죽지 않도록 방어
   const hanja = Array.isArray(word.hanja) ? word.hanja : [];
   const examples = Array.isArray(word.examples) ? word.examples : [];
@@ -75,12 +87,28 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
             {examples.map((ex, i) => (
               <li key={i} className="text-sm">
                 <div className="font-medium text-ink">{ex.jp}</div>
-                <div className="text-xs text-mut">{ex.kana}</div>
+                {ex.kana !== ex.jp && <div className="text-xs text-mut">{ex.kana}</div>}
                 <div className="text-xs text-sub">{ex.ko}</div>
               </li>
             ))}
           </ul>
         </div>
+
+        {onAddBook && (
+          <button
+            type="button"
+            disabled={inBook}
+            onClick={onAddBook}
+            className={[
+              "pointer-events-auto mt-3 w-full rounded-xl py-2.5 text-sm font-bold transition active:scale-[0.98]",
+              inBook
+                ? "bg-mint-soft text-mint"
+                : "bg-pri text-white shadow-soft hover:bg-pri-deep",
+            ].join(" ")}
+          >
+            {inBook ? "✓ 단어장에 있어요" : "📥 단어장에 넣기"}
+          </button>
+        )}
       </div>
     </div>
   );

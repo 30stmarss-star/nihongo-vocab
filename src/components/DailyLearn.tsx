@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
+import { JpText } from "./JpText";
 
 /**
  * 오늘의 단어 — 카드 한 장씩 집중 학습.
@@ -13,13 +14,15 @@ interface Props {
   words: Word[];
   newCount: number; // words 앞쪽 newCount개가 새 단어
   startIndex: number;
+  dictionary: Word[]; // 예문 속 단어 탭 → 카드용 사전
+  onShowCard: (word: Word, x: number, y: number) => void;
   onSeen: (id: string) => void; // 카드가 처음 화면에 나옴(도입 기록)
   onProgress: (index: number) => void; // 이어하기 저장
   onDone: () => void;
   onExit: () => void;
 }
 
-export function DailyLearn({ words, newCount, startIndex, onSeen, onProgress, onDone, onExit }: Props) {
+export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard, onSeen, onProgress, onDone, onExit }: Props) {
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, words.length - 1)));
   const [open, setOpen] = useState(false);
 
@@ -79,11 +82,15 @@ export function DailyLearn({ words, newCount, startIndex, onSeen, onProgress, on
 
       {/* 카드 */}
       <div className="mt-6 flex flex-1 flex-col">
-        <button
-          type="button"
+        <div
+          role="button"
+          tabIndex={0}
           onClick={() => setOpen((o) => !o)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" || e.key === " ") setOpen((o) => !o);
+          }}
           key={w.id}
-          className="flex min-h-[22rem] w-full grow animate-[cardIn_0.25s_ease-out] flex-col rounded-3xl bg-card p-6 text-left shadow-pop"
+          className="flex min-h-[22rem] w-full grow animate-[cardIn_0.25s_ease-out] cursor-pointer flex-col rounded-3xl bg-card p-6 text-left shadow-pop"
         >
           <div className="flex items-center gap-2">
             <span
@@ -104,17 +111,18 @@ export function DailyLearn({ words, newCount, startIndex, onSeen, onProgress, on
               {pre}
               {w.kanji}
             </div>
-            {w.kanji !== w.kana && (
-              <div className="mt-3 text-xl font-medium text-pri">
-                {pre}
-                {w.kana}
-              </div>
-            )}
-            {trad && <div className="mt-1 text-sm text-gold">한국식 정자 {trad}</div>}
 
             {open ? (
-              <div className="mt-6 w-full animate-[popIn_0.2s_ease-out]">
-                <div className="text-2xl font-bold text-pri-deep">{w.meaning}</div>
+              <div className="mt-5 w-full animate-[popIn_0.2s_ease-out]">
+                {/* 독음·정자는 답을 열어야 보인다 — 먼저 떠올려보게 */}
+                {w.kanji !== w.kana && (
+                  <div className="text-xl font-medium text-pri">
+                    {pre}
+                    {w.kana}
+                  </div>
+                )}
+                {trad && <div className="mt-1 text-sm text-gold">한국식 정자 {trad}</div>}
+                <div className="mt-3 text-2xl font-bold text-pri-deep">{w.meaning}</div>
                 {hanja.length > 0 && (
                   <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                     {hanja.map((h, i) => (
@@ -127,17 +135,22 @@ export function DailyLearn({ words, newCount, startIndex, onSeen, onProgress, on
                 )}
                 {examples.slice(0, 2).map((ex, i) => (
                   <div key={i} className="mt-4 rounded-2xl bg-base p-3 text-left">
-                    <div className="text-sm font-medium text-ink">{ex.jp}</div>
-                    <div className="mt-0.5 text-xs text-mut">{ex.kana}</div>
+                    <div className="text-sm font-medium leading-relaxed text-ink">
+                      <JpText text={ex.jp} dictionary={dictionary} onShowCard={onShowCard} />
+                    </div>
+                    {ex.kana !== ex.jp && <div className="mt-0.5 text-xs text-mut">{ex.kana}</div>}
                     <div className="mt-0.5 text-xs text-sub">{ex.ko}</div>
                   </div>
                 ))}
+                {examples.length > 0 && (
+                  <div className="mt-2 text-[11px] text-mut">예문 속 단어를 탭하면 단어 카드가 떠요</div>
+                )}
               </div>
             ) : (
-              <div className="mt-8 text-sm font-medium text-mut">탭해서 뜻 보기</div>
+              <div className="mt-8 text-sm font-medium text-mut">탭해서 독음·뜻 보기</div>
             )}
           </div>
-        </button>
+        </div>
       </div>
 
       {/* 하단 버튼 */}
@@ -153,7 +166,7 @@ export function DailyLearn({ words, newCount, startIndex, onSeen, onProgress, on
           onClick={() => go(1)}
           className="flex-1 rounded-2xl bg-pri py-3.5 font-bold text-white shadow-soft transition hover:bg-pri-deep active:scale-95"
         >
-          {last ? "학습 완료 🎉" : open ? "다음 →" : "알아요, 다음 →"}
+          {last ? "학습 완료 🎉" : "다음 단어 →"}
         </button>
       </div>
     </div>

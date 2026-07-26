@@ -368,6 +368,20 @@ export default function App() {
 
   const focusMode = FOCUS_VIEWS.includes(view);
 
+  // 단어 카드 오버레이 (모든 화면 공용) — 카드에서 바로 단어장에 넣을 수 있다
+  const cardOverlay = (
+    <CardOverlay
+      card={card}
+      setCard={setCard}
+      inBook={card ? wordbook.has(card.word.id) : undefined}
+      onAddBook={
+        card
+          ? () => setWordbook((prev) => addToWordbook(userId, [card.word.id], prev))
+          : undefined
+      }
+    />
+  );
+
   // ── 코스 집중 화면 (하단 네비 없음) ──
   if (view === "learn") {
     return (
@@ -376,6 +390,10 @@ export default function App() {
           words={planWords.list}
           newCount={planWords.newCount}
           startIndex={plan.learnIndex}
+          dictionary={words}
+          onShowCard={(word, x, y) =>
+            setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
           onSeen={onSeen}
           onProgress={(i) => updatePlan({ learnIndex: i })}
           onDone={() => {
@@ -384,7 +402,7 @@ export default function App() {
           }}
           onExit={() => setView("home")}
         />
-        <CardOverlay card={card} setCard={setCard} />
+        {cardOverlay}
       </main>
     );
   }
@@ -420,7 +438,7 @@ export default function App() {
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
           }
         />
-        <CardOverlay card={card} setCard={setCard} />
+        {cardOverlay}
       </main>
     );
   }
@@ -536,7 +554,7 @@ export default function App() {
         <ConfusableCards userId={userId} />
       )}
 
-      <CardOverlay card={card} setCard={setCard} />
+      {cardOverlay}
 
       {/* 하단 네비 */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
@@ -596,9 +614,13 @@ export default function App() {
 function CardOverlay({
   card,
   setCard,
+  inBook,
+  onAddBook,
 }: {
   card: { word: Word; x: number; y: number } | null;
   setCard: (c: null) => void;
+  inBook?: boolean;
+  onAddBook?: () => void;
 }) {
   if (!card) return null;
   return (
@@ -609,7 +631,7 @@ function CardOverlay({
         className="fixed inset-0 z-40 cursor-default"
         onClick={() => setCard(null)}
       />
-      <WordCard word={card.word} x={card.x} y={card.y} />
+      <WordCard word={card.word} x={card.x} y={card.y} inBook={inBook} onAddBook={onAddBook} />
     </>
   );
 }
