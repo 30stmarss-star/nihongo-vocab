@@ -212,8 +212,8 @@ function WordRow({
           화면 오른쪽 가장자리 어디를 눌러도 체크와 무관하다. */}
       <div className="relative flex flex-1 items-center py-2.5">
         <div className="grid flex-1 grid-cols-2 gap-2 sm:gap-4">
-          <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-ink font-semibold" : "text-sub"} />
-          <MaskedCell text={maskedRight} revealed={revealed} className="text-sub" />
+          <MaskedCell text={maskedLeft} revealed={revealed} className="text-ink font-semibold" />
+          <MaskedCell text={maskedRight} revealed={revealed} className="text-ink font-medium" />
         </div>
       </div>
 
@@ -261,7 +261,7 @@ function MaskedCell({
         aria-hidden
         className={[
           "absolute inset-y-0 left-0 right-0 rounded-md",
-          "bg-line/80",
+          "bg-[#d9def0]",
           "transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",
         ].join(" ")}

@@ -247,10 +247,11 @@ export default function App() {
   }, [plan, words]);
 
   const bookWords = useMemo(() => {
-    const seen = bandPool.filter((w) => (progress[w.id]?.seenCount ?? 0) > 0);
-    // 학습 중 → 외움 → 완전 암기 순. 그룹 안에서는 최근 본 순.
-    const rank = (w: Word) => (isRetired(progress[w.id]) ? 2 : isKnown(progress[w.id]) ? 1 : 0);
-    return seen.sort(
+    // 단어장 = 외운(체크한) 단어만. 못 외운 단어는 복습 사이클이 다시 데려온다.
+    const known = bandPool.filter((w) => isKnown(progress[w.id]));
+    // 외움 → 완전 암기(하단) 순. 그룹 안에서는 최근 본 순.
+    const rank = (w: Word) => (isRetired(progress[w.id]) ? 1 : 0);
+    return known.sort(
       (a, b) => rank(a) - rank(b) || (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
     );
   }, [bandPool, progress]);
@@ -416,15 +417,15 @@ export default function App() {
       ) : view === "wordbook" ? (
         bookWords.length === 0 ? (
           <div className="rounded-3xl bg-card px-6 py-14 text-center text-sm text-mut shadow-soft">
-            아직 배운 단어가 없어요.
+            아직 외운 단어가 없어요.
             <br />
-            오늘의 코스에서 단어를 만나면 여기에 쌓여요.
+            체크(✓)한 단어들이 여기에 모여요.
           </div>
         ) : (
           <>
             <div className="mb-3 flex items-center gap-2">
               <p className="text-xs leading-relaxed text-mut">
-                지금까지 배운 {bookWords.length}단어. 꾹 누르면 정답,{" "}
+                외운 단어 {bookWords.length}개. 꾹 누르면 정답,{" "}
                 <b className="text-sub">단어를 빠르게 두 번 탭</b>하면 체크 토글!
               </p>
               <button
