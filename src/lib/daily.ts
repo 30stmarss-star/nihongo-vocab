@@ -108,6 +108,7 @@ export interface DailyPlan {
   speakScenario?: { emoji: string; title: string; desc: string }; // Claude가 창작한 오늘의 상황
   speakIntro?: string; // 상황 도입 문구(이어하기용)
   speakTurns?: SpeakTurn[]; // 진행된 대화(이어하기용)
+  speakLogId?: string; // 이 코스의 작문 기록 id (서버 저장용)
   speakDone: boolean;
   speakSkipped?: boolean; // 오프라인 등으로 건너뜀
   examItems?: ExamItem[]; // 백그라운드로 미리 만들어 둔 문장형 문제
@@ -188,6 +189,70 @@ export function buildDailyPlan(
 
 export function scenarioOf(plan: DailyPlan): Scenario {
   return SCENARIOS.find((s) => s.id === plan.scenarioId) ?? SCENARIOS[0];
+}
+
+// ── 작문 대화 기록 (나중에 다시 읽어보기) ──
+
+export interface SpeakLog {
+  id: string;
+  day: string;
+  scenario: { emoji: string; title: string; desc: string } | null;
+  intro: string;
+  turns: SpeakTurn[];
+  done: boolean;
+  updatedAt: string;
+}
+
+/** 진행 중인 대화를 그때그때 서버에 올린다 (중간에 나가도 남게) */
+export function saveSpeakLog(
+  uid: string | null,
+  log: Omit<SpeakLog, "updatedAt">
+): void {
+  if (!(CLOUD && supabase && uid) || !log.id) return;
+  void supabase
+    .from("speaking_log")
+    .upsert(
+      {
+        id: log.id,
+        user_id: uid,
+        day: log.day,
+        scenario: log.scenario,
+        intro: log.intro,
+        turns: log.turns,
+        done: log.done,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "id" }
+    )
+    .then(({ error }) => {
+      if (error) console.warn("[speak] 기록 저장 실패:", error.message);
+    });
+}
+
+/** 지난 작문 기록 목록 (최근순) */
+export async function loadSpeakLogs(uid: string | null, limit = 50): Promise<SpeakLog[]> {
+  if (!(CLOUD && supabase && uid)) return [];
+  try {
+    const { data, error } = await supabase
+      .from("speaking_log")
+      .select("*")
+      .eq("user_id", uid)
+      .order("updated_at", { ascending: false })
+      .limit(limit);
+    if (error) throw error;
+    return (data ?? []).map((r) => ({
+      id: r.id,
+      day: r.day,
+      scenario: r.scenario ?? null,
+      intro: r.intro ?? "",
+      turns: Array.isArray(r.turns) ? r.turns : [],
+      done: !!r.done,
+      updatedAt: r.updated_at ?? "",
+    }));
+  } catch (e) {
+    console.warn("[speak] 기록 불러오기 실패:", e instanceof Error ? e.message : e);
+    return [];
+  }
 }
 
 // ── 최근에 나온 작문 상황 (반복 방지용, 최근 20개 제목 보관) ──

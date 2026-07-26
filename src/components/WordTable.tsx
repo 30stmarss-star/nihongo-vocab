@@ -7,7 +7,16 @@ import {
 } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
-import { isRetired, type Progress } from "../lib/srs";
+import { isKnown, isRetired, type Progress } from "../lib/srs";
+
+/** 단어장에서 내가 직접 매기는 3단계 */
+export type WordLevel = "hard" | "easy" | "done";
+
+const LEVEL_LABEL: Record<WordLevel, string> = {
+  hard: "어려움",
+  easy: "쉬움",
+  done: "완전 암기",
+};
 
 /**
  * mode:
@@ -21,8 +30,7 @@ interface Props {
   words: Word[];
   progress: Record<string, Progress | undefined>;
   onShowCard: (word: Word, x: number, y: number) => void;
-  onRetire: (id: string) => void;
-  onUnretire: (id: string) => void;
+  onSetLevel: (id: string, level: WordLevel) => void;
   mode?: Mode;
 }
 
@@ -59,12 +67,12 @@ function WordRow({
   word,
   progress,
   onShowCard,
-  onRetire,
-  onUnretire,
+  onSetLevel,
   mode = "jp",
 }: { word: Word } & Omit<Props, "words">) {
   const [revealed, setRevealed] = useState(false);
   const [flash, setFlash] = useState(false);
+  const [flashKind, setFlashKind] = useState<WordLevel>("easy");
   const flashTimer = useRef<number | undefined>(undefined);
   // 따닥(더블탭) 체크: 단어를 빠르게 두 번 탭하면 체크 토글 (한 손 조작용).
   // 첫 탭은 300ms 뒤에 카드를 띄우고, 그 안에 두 번째 탭이 오면 카드 대신 체크.
@@ -101,7 +109,8 @@ function WordRow({
   };
 
   const p = progress[word.id];
-  const retired = isRetired(p); // 완전 암기
+  const level: WordLevel = isRetired(p) ? "done" : isKnown(p) ? "easy" : "hard";
+  const retired = level === "done";
   const ko = mode === "ko";
 
   // 후행 결합형(예: ~ながら)이면 일본어 표제어·독음 앞에 ~를 붙인다.
@@ -114,13 +123,17 @@ function WordRow({
   const maskedLeft = ko ? jpKanji : jpKana; // 가려진 첫 칸
   const maskedRight = ko ? jpKana : word.meaning; // 가려진 둘째 칸
 
-  // 단일 토글: 없음 ↔ 완전 암기(금색). 해제해도 숙련도는 유지된다.
-  function toggle() {
-    if (retired) {
-      onUnretire(word.id);
-      return;
-    }
-    onRetire(word.id);
+  const NEXT: Record<WordLevel, WordLevel> = { hard: "easy", easy: "done", done: "hard" };
+
+  /** 왼쪽 원: 어려움 → 쉬움 → 완전 암기 → 어려움 */
+  function cycle() {
+    setLevel(NEXT[level]);
+  }
+
+  function setLevel(next: WordLevel) {
+    if (next === level) return;
+    onSetLevel(word.id, next);
+    setFlashKind(next);
     setFlash(true);
     window.clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlash(false), 650);
@@ -131,18 +144,17 @@ function WordRow({
       className={[
         "relative flex min-h-[3.25rem] items-stretch px-3 py-1.5 transition-colors",
         "border-b border-line last:border-0",
-        retired ? "bg-gold-soft/60" : "",
-        flash ? "bg-gold-soft" : "",
+        level === "done" ? "bg-gold-soft/60" : level === "easy" ? "bg-mint-soft/50" : "",
+        flash ? (flashKind === "done" ? "bg-gold-soft" : flashKind === "easy" ? "bg-mint-soft" : "bg-coral-soft") : "",
       ].join(" ")}
     >
-      {/* 완전 암기 체크: 행 맨 왼쪽. 누르면 금색(다시 복습에 안 나옴), 한 번 더 누르면 해제. */}
+      {/* 난이도: 행 맨 왼쪽. 누를 때마다 어려움 → 쉬움 → 완전 암기 순으로 돈다. */}
       <div className="no-select relative z-20 flex w-11 shrink-0 items-stretch">
         <button
           type="button"
-          aria-label={retired ? "완전 암기 해제" : "완전 암기로 표시"}
-          aria-pressed={retired}
+          aria-label={`난이도 ${LEVEL_LABEL[level]} — 눌러서 바꾸기`}
           draggable={false}
-          onClick={toggle}
+          onClick={cycle}
           onContextMenu={(e) => e.preventDefault()}
           style={{ touchAction: "manipulation" }}
           className="group no-select flex h-full w-full cursor-pointer items-center justify-center transition active:scale-95"
@@ -150,12 +162,14 @@ function WordRow({
           <span
             className={[
               "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
-              retired
+              level === "done"
                 ? "bg-gold text-white shadow-[0_0_10px_2px_rgba(237,162,58,0.45)] ring-2 ring-gold/50"
-                : "border-2 border-line text-transparent group-hover:border-gold/70",
+                : level === "easy"
+                  ? "bg-mint text-white shadow-sm shadow-mint/40"
+                  : "border-2 border-coral/50 text-coral",
             ].join(" ")}
           >
-            ✓
+            {level === "done" ? "★" : level === "easy" ? "✓" : "!"}
           </span>
         </button>
       </div>
@@ -178,7 +192,7 @@ function WordRow({
               // 따닥: 두 번째 탭 → 카드 대신 체크 토글
               window.clearTimeout(tapTimer.current);
               tapTimer.current = undefined;
-              toggle();
+              setLevel(retired ? "hard" : "done"); // 따닥 = 완전 암기 토글
             } else {
               tapTimer.current = window.setTimeout(() => {
                 tapTimer.current = undefined;
@@ -211,10 +225,10 @@ function WordRow({
         <span
           className={[
             "pointer-events-none absolute left-12 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm font-bold",
-            "text-gold",
+            flashKind === "done" ? "text-gold" : flashKind === "easy" ? "text-mint" : "text-coral",
           ].join(" ")}
         >
-          ⭐ 완전 암기!
+          {flashKind === "done" ? "⭐ 완전 암기!" : flashKind === "easy" ? "✓ 쉬움" : "😵 어려움"}
         </span>
       )}
     </li>

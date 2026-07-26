@@ -312,7 +312,7 @@ export function Speaking(props: Props) {
 }
 
 /** 평가 카드: 판정 + 모범 답안(단어 탭 → 카드) + 피드백(마크다운 라이트) */
-function EvalCard({
+export function EvalCard({
   turn,
   dictionary,
   onShowCard,
@@ -355,7 +355,7 @@ function EvalCard({
 }
 
 /** 아주 가벼운 마크다운 렌더러: **굵게**, "- " 목록, 줄바꿈만 처리 */
-function MdLite({ text }: { text: string }) {
+export function MdLite({ text }: { text: string }) {
   const lines = text.split(/\r?\n/);
   return (
     <div className="space-y-1">

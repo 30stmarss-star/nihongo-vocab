@@ -7,7 +7,6 @@ import {
   markKnown,
   markRetired,
   markUnknown,
-  markUnretire,
   touch,
   type ProgressMap,
 } from "./lib/srs";
@@ -34,6 +33,8 @@ import {
   recordAccess,
   recordDone,
   savePlan,
+  saveSpeakLog,
+  SPEAK_STEPS,
   streakOf,
   syncActivity,
   syncPlan,
@@ -54,15 +55,18 @@ import { Home } from "./components/Home";
 import { DailyLearn } from "./components/DailyLearn";
 import { DailyTest } from "./components/DailyTest";
 import { Speaking } from "./components/Speaking";
+import { SpeakingLog } from "./components/SpeakingLog";
 import { isTokenWord } from "./components/JpText";
 import { BUILD_ID, forceUpdate } from "./lib/version";
 
 type View =
   | "home"
   | "learn"
+  | "relearn"
   | "speak"
   | "test"
   | "wordbook"
+  | "speaklog"
   | "scan"
   | "kanji"
   | "tutor"
@@ -72,7 +76,7 @@ type View =
 type Phase = "loading" | "login" | "ready";
 
 /** 코스 진행 화면(전체 화면 집중 모드) — 하단 네비를 숨긴다 */
-const FOCUS_VIEWS: View[] = ["learn", "speak", "test"];
+const FOCUS_VIEWS: View[] = ["learn", "relearn", "speak", "test"];
 
 /** 단어장 정렬 기준: 0=어려움(아직 못 외움) 1=쉬움 2=완전 암기 */
 function difficultyRank(w: Word, progress: ProgressMap): 0 | 1 | 2 {
@@ -300,26 +304,42 @@ export default function App() {
   // 안에서 체크를 바꿔도 행이 제자리에 있게 한다(체크 풀자마자 튀지 않게).
   // 새로 추가된 단어만 뒤에 붙는다.
   const [bookDisplay, setBookDisplay] = useState<Word[]>([]);
+  // 그룹 배정도 같이 얼려둔다 — 체크하자마자 다른 묶음으로 튀지 않게.
+  // (행의 색은 실시간으로 바뀌어서 방금 체크한 게 보인다)
+  const [bookRanks, setBookRanks] = useState<Map<string, 0 | 1 | 2>>(new Map());
   const prevViewRef = useRef<View>(view);
   useEffect(() => {
     const wasBook = prevViewRef.current === "wordbook";
     prevViewRef.current = view;
     if (view !== "wordbook") return;
+
+    const rankOf = (list: Word[], base: Map<string, 0 | 1 | 2>) => {
+      const m = new Map(base);
+      for (const w of list) if (!m.has(w.id)) m.set(w.id, difficultyRank(w, progress));
+      return m;
+    };
+
     if (!wasBook) {
+      // 탭에 새로 들어옴: 이때만 재정렬한다
       setBookDisplay(bookWords);
+      setBookRanks(rankOf(bookWords, new Map()));
       return;
     }
+    // 머무는 동안 새로 담긴 단어만 뒤에 붙인다
     setBookDisplay((prev) => {
       const shown = new Set(prev.map((w) => w.id));
       const additions = bookWords.filter((w) => !shown.has(w.id));
-      return additions.length ? [...prev, ...additions] : prev;
+      if (!additions.length) return prev;
+      setBookRanks((r) => rankOf(additions, r));
+      return [...prev, ...additions];
     });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookWords, view]);
 
   // 단어장을 난이도로 묶는다 — 어려운 단어가 맨 위에 오도록.
   const bookGroups = useMemo(() => {
     const buckets: Word[][] = [[], [], []];
-    for (const w of bookDisplay) buckets[difficultyRank(w, progress)].push(w);
+    for (const w of bookDisplay) buckets[bookRanks.get(w.id) ?? 0].push(w);
     const meta = [
       { key: "hard", label: "😵 어려움", tone: "text-coral" },
       { key: "easy", label: "😎 쉬움", tone: "text-mint" },
@@ -328,7 +348,7 @@ export default function App() {
     return meta
       .map((m, i) => ({ ...m, words: buckets[i] }))
       .filter((g) => g.words.length > 0);
-  }, [bookDisplay, progress]);
+  }, [bookDisplay, bookRanks]);
 
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
@@ -464,13 +484,15 @@ export default function App() {
   );
 
   // ── 코스 집중 화면 (하단 네비 없음) ──
-  if (view === "learn") {
+  if (view === "learn" || view === "relearn") {
+    const isReview = view === "relearn";
     return (
       <main className="min-h-full">
         <DailyLearn
           words={planWords.list}
           newCount={planWords.newCount}
-          startIndex={plan.learnIndex}
+          startIndex={isReview ? 0 : plan.learnIndex}
+          review={isReview}
           dictionary={words}
           onShowCard={(word, x, y) =>
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
@@ -479,7 +501,7 @@ export default function App() {
           onRate={(id, r) => update(id, r === "hard" ? markUnknown : markKnown)}
           onProgress={(i) => updatePlan({ learnIndex: i })}
           onDone={() => {
-            updatePlan({ learnDone: true });
+            if (!isReview) updatePlan({ learnDone: true });
             setView("home");
           }}
           onExit={() => setView("home")}
@@ -504,11 +526,31 @@ export default function App() {
           dictionary={words}
           initialIntro={plan.speakIntro}
           initialTurns={plan.speakTurns}
-          onState={(intro, turns, answered) =>
-            updatePlan({ speakIntro: intro, speakTurns: turns, speakStep: answered })
-          }
+          onState={(intro, turns, answered) => {
+            // 대화는 기기와 무관하게 남도록 서버에도 그때그때 올린다
+            const id = plan.speakLogId ?? crypto.randomUUID();
+            updatePlan({ speakIntro: intro, speakTurns: turns, speakStep: answered, speakLogId: id });
+            saveSpeakLog(userId, {
+              id,
+              day: plan.day,
+              scenario: plan.speakScenario ?? null,
+              intro,
+              turns,
+              done: answered >= SPEAK_STEPS,
+            });
+          }}
           onDone={() => {
             updatePlan({ speakDone: true });
+            if (plan.speakLogId) {
+              saveSpeakLog(userId, {
+                id: plan.speakLogId,
+                day: plan.day,
+                scenario: plan.speakScenario ?? null,
+                intro: plan.speakIntro ?? "",
+                turns: plan.speakTurns ?? [],
+                done: true,
+              });
+            }
             setView("home");
           }}
           onSkip={() => {
@@ -551,7 +593,7 @@ export default function App() {
     >
       <header className="mb-4 flex items-center gap-3">
         <h1 className="text-lg font-extrabold text-ink">
-          {view === "wordbook" ? "단어장 📚" : "일본어 하루 코스"}
+          {view === "wordbook" ? "단어장 📚" : view === "speaklog" ? "작문 기록 💬" : "일본어 하루 코스"}
         </h1>
         <select
           value={band}
@@ -566,7 +608,7 @@ export default function App() {
         </select>
       </header>
 
-      {(view === "kanji" || view === "tutor" || view === "quiz" || view === "reference") && (
+      {(view === "kanji" || view === "tutor" || view === "quiz" || view === "reference" || view === "speaklog") && (
         <button onClick={() => setView("home")} className="mb-3 -mt-1 text-sm font-semibold text-sub transition hover:text-ink">
           ← 홈으로
         </button>
@@ -583,7 +625,10 @@ export default function App() {
           newCount={planWords.newCount}
           reviewCount={planWords.list.length - planWords.newCount}
           learnTotal={planWords.list.length}
-          onStart={(step) => setView(step)}
+          onStart={(step) =>
+            // 이미 끝낸 단어 단계를 다시 누르면 1번부터 복습 모드로
+            setView(step === "learn" && plan.learnDone ? "relearn" : step)
+          }
           onNewCycle={newCycle}
         />
       ) : view === "wordbook" ? (
@@ -622,14 +667,23 @@ export default function App() {
                     onShowCard={(word, x, y) =>
                       setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
                     }
-                    onRetire={(id) => update(id, markRetired)}
-                    onUnretire={(id) => update(id, markUnretire)}
+                    onSetLevel={(id, lv) =>
+                      update(id, lv === "done" ? markRetired : lv === "easy" ? markKnown : markUnknown)
+                    }
                   />
                 </section>
               ))}
             </div>
           </>
         )
+      ) : view === "speaklog" ? (
+        <SpeakingLog
+          userId={userId}
+          dictionary={words}
+          onShowCard={(word, x, y) =>
+            setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
+        />
       ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
       ) : view === "tutor" ? (
@@ -674,6 +728,9 @@ export default function App() {
           <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-2xl rounded-t-3xl bg-card p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-pop">
             <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
             <div className="grid grid-cols-2 gap-2">
+              {CLOUD && userId && (
+                <SheetBtn icon="💬" label="작문 기록" onClick={() => go("speaklog")} />
+              )}
               <SheetBtn icon="📝" label="자유 단어시험" onClick={() => go("quiz")} />
               <SheetBtn icon="🈯" label="닮은꼴 한자" onClick={() => go("kanji")} />
               <SheetBtn icon="📒" label="특수 암기" onClick={() => go("reference")} />

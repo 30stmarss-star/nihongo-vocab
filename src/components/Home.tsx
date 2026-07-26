@@ -81,6 +81,7 @@ export function Home({
             gradient="linear-gradient(135deg,#8da2fb,#6b7ff2)"
             title="오늘의 단어"
             subtitle={`새 단어 ${newCount} · 복습 ${reviewCount}`}
+            subtitleDone="눌러서 처음부터 다시 보기"
             state={
               plan.learnDone
                 ? { kind: "done" }
@@ -215,6 +216,7 @@ function StepRow({
   gradient,
   title,
   subtitle,
+  subtitleDone,
   state,
   locked,
   onClick,
@@ -223,6 +225,7 @@ function StepRow({
   gradient: string;
   title: string;
   subtitle: string;
+  subtitleDone?: string; // 완료 뒤에는 다른 안내를 보여준다
   state: StepState;
   locked?: boolean;
   onClick: () => void;
@@ -249,7 +252,9 @@ function StepRow({
       </span>
       <span className="min-w-0 flex-1">
         <span className="block font-bold text-ink">{title}</span>
-        <span className="block truncate text-xs font-medium text-sub">{subtitle}</span>
+        <span className="block truncate text-xs font-medium text-sub">
+          {state.kind === "done" && subtitleDone ? subtitleDone : subtitle}
+        </span>
       </span>
       {state.kind === "done" ? (
         <span className="rounded-full bg-mint px-2.5 py-1 text-xs font-bold text-white">✓ {state.label ?? "완료"}</span>

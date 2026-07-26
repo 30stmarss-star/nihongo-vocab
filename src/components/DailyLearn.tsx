@@ -20,21 +20,22 @@ interface Props {
   onShowCard: (word: Word, x: number, y: number) => void;
   onSeen: (id: string) => void; // 카드가 처음 화면에 나옴(도입 기록)
   onRate: (id: string, rating: "hard" | "easy") => void; // 어려움/쉬움 평가
+  review?: boolean; // 복습 모드: 이미 끝낸 오늘의 단어를 처음부터 다시 넘겨보기
   onProgress: (index: number) => void; // 이어하기 저장
   onDone: () => void;
   onExit: () => void;
 }
 
-export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
+export function DailyLearn({ words, newCount, startIndex, dictionary, review, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, words.length - 1)));
   const [open, setOpen] = useState(false);
 
   const w = words[idx];
   const isNew = idx < newCount;
 
-  // 카드가 등장할 때 도입 기록 + 진행 저장
+  // 카드가 등장할 때 도입 기록 + 진행 저장 (복습 모드는 진행을 건드리지 않는다)
   useEffect(() => {
-    if (w) {
+    if (w && !review) {
       onSeen(w.id);
       onProgress(idx);
     }
@@ -158,8 +159,26 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
         </div>
       </div>
 
-      {/* 하단: 이 단어가 어땠는지 남기고 넘어간다 */}
+      {/* 하단: 이 단어가 어땠는지 남기고 넘어간다 (복습 모드는 넘기기만) */}
       <div className="mt-5">
+        {review ? (
+          <div className="flex gap-3">
+            <button
+              onClick={() => go(-1)}
+              disabled={idx === 0}
+              className="rounded-2xl bg-card px-5 py-3.5 font-bold text-sub shadow-soft transition active:scale-95 disabled:opacity-40"
+            >
+              ← 이전
+            </button>
+            <button
+              onClick={() => go(1)}
+              className="flex-1 rounded-2xl bg-pri py-3.5 font-bold text-white shadow-soft transition hover:bg-pri-deep active:scale-95"
+            >
+              {last ? "복습 끝 →" : "다음 단어 →"}
+            </button>
+          </div>
+        ) : (
+        <>
         <div className="flex gap-3">
           <button
             onClick={() => rate("hard")}
@@ -192,6 +211,8 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
             {last ? "완료 →" : "건너뛰기 →"}
           </button>
         </div>
+        </>
+        )}
       </div>
     </div>
   );

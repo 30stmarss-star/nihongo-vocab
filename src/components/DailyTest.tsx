@@ -394,6 +394,10 @@ export function DailyTest({
                 {q.label} — {q.hint}
               </div>
             )}
+            {/* 다른 보기들도 무슨 단어였는지 알려준다 — 헷갈린 짝을 같이 정리하게 */}
+            {q.kind !== "type" && (
+              <ChoiceGlossary q={q} picked={judged.picked} dictionary={bandWords} />
+            )}
           </div>
         )}
       </div>
@@ -409,6 +413,53 @@ export function DailyTest({
           계속 →
         </button>
       )}
+    </div>
+  );
+}
+
+/**
+ * 오답 보기 풀이. 보기 하나하나가 무슨 단어였는지 사전에서 찾아 붙인다.
+ * 「厳しい」를 고르려다 「優しい」를 골랐다면 그 둘을 같이 정리해야 다음에 안 틀린다.
+ */
+function ChoiceGlossary({
+  q,
+  picked,
+  dictionary,
+}: {
+  q: Exclude<Question, { kind: "type" }>;
+  picked?: number;
+  dictionary: Word[];
+}) {
+  const index = useMemo(() => {
+    const m = new Map<string, Word>();
+    for (const w of dictionary) {
+      if (!m.has(w.kanji)) m.set(w.kanji, w);
+      if (!m.has(w.kana)) m.set(w.kana, w);
+    }
+    return m;
+  }, [dictionary]);
+
+  // 용법 문제는 보기가 통문장이라 단어 풀이가 의미 없다
+  if (q.kind === "usage") return null;
+
+  const rows = q.choices
+    .map((c, i) => ({ c, i, w: index.get(c) }))
+    .filter((r) => r.w && r.i !== q.answer);
+  if (!rows.length) return null;
+
+  return (
+    <div className="mt-3 border-t border-ink/10 pt-2.5">
+      <div className="text-[11px] font-bold text-mut">다른 보기</div>
+      <ul className="mt-1 space-y-1">
+        {rows.map(({ c, i, w }) => (
+          <li key={i} className="flex items-baseline gap-1.5 text-xs">
+            <span className={["font-bold", i === picked ? "text-coral" : "text-ink"].join(" ")}>{c}</span>
+            {w!.kanji !== w!.kana && c !== w!.kana && <span className="text-pri-deep">{w!.kana}</span>}
+            <span className="text-sub">{w!.meaning}</span>
+            {i === picked && <span className="ml-auto text-[10px] font-bold text-coral">내가 고른 답</span>}
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
