@@ -67,7 +67,7 @@ export function ExampleLine({
   }
 
   return (
-    <div className="mt-4 rounded-2xl bg-base p-3 text-left">
+    <div className="mt-4 rounded-2xl bg-page p-3 text-left">
       <div className="text-sm font-medium leading-relaxed text-ink">
         <JpText text={ex.jp} dictionary={dictionary} tokens={tokens} onShowCard={onShowCard} />
       </div>

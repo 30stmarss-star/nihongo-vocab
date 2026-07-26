@@ -115,7 +115,7 @@ export function KanjiInsight({ word }: { word: Word }) {
       {open && data && (
         <div className="mt-3 animate-[popIn_0.2s_ease-out] space-y-3">
           {data.chars.map((c, i) => (
-            <div key={i} className="rounded-2xl bg-base p-4">
+            <div key={i} className="rounded-2xl bg-page p-4">
               <div className="flex items-baseline gap-2">
                 <span className="text-3xl font-bold text-ink">{c.char}</span>
                 <span className="text-sm font-bold text-gold">{c.korean}</span>

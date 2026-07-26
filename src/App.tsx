@@ -863,7 +863,7 @@ function SheetBtn({ icon, label, onClick }: { icon: string; label: string; onCli
   return (
     <button
       onClick={onClick}
-      className="flex items-center gap-2.5 rounded-2xl bg-base px-4 py-3 text-left text-sm font-bold text-ink transition hover:bg-pri-soft active:scale-[0.98]"
+      className="flex items-center gap-2.5 rounded-2xl bg-page px-4 py-3 text-left text-sm font-bold text-ink transition hover:bg-pri-soft active:scale-[0.98]"
     >
       <span className="text-lg">{icon}</span>
       {label}

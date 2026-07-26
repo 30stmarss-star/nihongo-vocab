@@ -126,7 +126,7 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
           <span
             aria-hidden
             className={[
-              "pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-pri ring-4 ring-base transition-transform",
+              "pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-pri ring-4 ring-page transition-transform",
               scrubbing ? "scale-125" : "",
             ].join(" ")}
             style={{ left: `${((idx + 1) / words.length) * 100}%` }}
@@ -158,7 +158,7 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
             >
               {isNew ? "새 단어" : "복습"}
             </span>
-            <span className="rounded-full bg-base px-2.5 py-1 text-xs font-semibold text-sub">
+            <span className="rounded-full bg-page px-2.5 py-1 text-xs font-semibold text-sub">
               {w.level} · {typeLabel(w.type)}
             </span>
           </div>
@@ -183,7 +183,7 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
                 {hanja.length > 0 && (
                   <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                     {hanja.map((h, i) => (
-                      <span key={i} className="rounded-lg bg-base px-2 py-1 text-sm text-sub">
+                      <span key={i} className="rounded-lg bg-page px-2 py-1 text-sm text-sub">
                         <b className="mr-1 text-ink">{h.char}</b>
                         {h.reading}
                       </span>

@@ -224,7 +224,7 @@ function Mask({
       <span
         aria-hidden
         className={[
-          "absolute inset-0 rounded-md bg-base transition-opacity duration-200",
+          "absolute inset-0 rounded-md bg-page transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",
         ].join(" ")}
       />

@@ -372,7 +372,7 @@ export function DailyTest({
                 autoComplete="off"
                 autoCapitalize="off"
                 placeholder="예: にる 또는 니루"
-                className="mt-5 w-full rounded-2xl border-2 border-line bg-base px-4 py-3.5 text-lg text-ink outline-none transition focus:border-pri"
+                className="mt-5 w-full rounded-2xl border-2 border-line bg-page px-4 py-3.5 text-lg text-ink outline-none transition focus:border-pri"
               />
               {!judged && (
                 <button
@@ -688,7 +688,7 @@ function ScoreRing({ pct, good }: { pct: number; good: boolean }) {
   return (
     <div className="relative mx-auto h-32 w-32">
       <svg viewBox="0 0 120 120" className="h-full w-full -rotate-90">
-        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--color-base)" strokeWidth="12" />
+        <circle cx="60" cy="60" r={R} fill="none" stroke="var(--color-page)" strokeWidth="12" />
         <circle
           cx="60"
           cy="60"

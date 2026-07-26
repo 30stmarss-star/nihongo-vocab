@@ -51,7 +51,7 @@ export function WordCard({
           {word.kanji !== word.kana && (
             <span className="text-sm font-medium text-pri">{pre}{word.kana}</span>
           )}
-          <span className="ml-auto rounded-full bg-base px-2 py-0.5 text-xs font-semibold text-sub">
+          <span className="ml-auto rounded-full bg-page px-2 py-0.5 text-xs font-semibold text-sub">
             {word.level} · {typeLabel(word.type)}
           </span>
         </div>
@@ -69,7 +69,7 @@ export function WordCard({
                 return (
                   <span
                     key={i}
-                    className="rounded-md bg-base px-2 py-1 text-sm text-sub"
+                    className="rounded-md bg-page px-2 py-1 text-sm text-sub"
                   >
                     <b className="mr-1 text-ink">
                       {h.char}

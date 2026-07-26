@@ -68,7 +68,7 @@ export function Home({
           <h3 className="font-extrabold text-ink">오늘의 코스</h3>
           <span className="text-xs font-bold text-mut">{stepsDone}/3 단계</span>
         </div>
-        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-base">
+        <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-page">
           <div
             className="h-full rounded-full bg-pri transition-all duration-500"
             style={{ width: `${(stepsDone / 3) * 100}%` }}
@@ -158,7 +158,7 @@ export function Home({
                     title={d}
                     className={[
                       "aspect-square w-full rounded-[4px]",
-                      future ? "bg-transparent" : done ? "bg-pri" : accessed ? "bg-pri/30" : "bg-base",
+                      future ? "bg-transparent" : done ? "bg-pri" : accessed ? "bg-pri/30" : "bg-page",
                       isToday ? "ring-2 ring-coral" : "",
                     ].join(" ")}
                   />
@@ -175,7 +175,7 @@ export function Home({
           <h3 className="font-extrabold text-ink">{bandLabel} 정복률</h3>
           <span className="text-lg font-extrabold text-pri-deep">{stats.pct}%</span>
         </div>
-        <div className="mt-2.5 h-3.5 overflow-hidden rounded-full bg-base">
+        <div className="mt-2.5 h-3.5 overflow-hidden rounded-full bg-page">
           <div className="flex h-full">
             <div
               className="h-full bg-gold transition-all duration-500"
@@ -238,7 +238,7 @@ function StepRow({
       className={[
         "flex w-full items-center gap-3.5 rounded-2xl border-2 p-3 text-left transition active:scale-[0.98]",
         locked
-          ? "cursor-not-allowed border-line bg-base/60 opacity-60"
+          ? "cursor-not-allowed border-line bg-page/60 opacity-60"
           : state.kind === "done"
             ? "border-mint/40 bg-mint-soft/50"
             : "border-line bg-card hover:border-pri/50 hover:bg-pri-soft/30",

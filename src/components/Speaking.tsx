@@ -267,7 +267,7 @@ export function Speaking(props: Props) {
 
       {/* 입력 바 */}
       {!finished && current && (
-        <div className="sticky bottom-0 -mx-5 bg-base/95 px-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+        <div className="sticky bottom-0 -mx-5 bg-page/95 px-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-2 backdrop-blur">
           {/* 지금 무엇을 쓰라고 했는지 — 키보드가 올라와도 계속 보이게 입력창에 붙여 둔다 */}
           <div className="mb-2 max-h-24 overflow-y-auto rounded-2xl bg-pri-soft px-3.5 py-2.5">
             <div className="text-[11px] font-bold text-pri">

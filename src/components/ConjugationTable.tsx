@@ -30,7 +30,7 @@ export function ConjugationTable({ word }: { word: Word }) {
       </button>
 
       {open && (
-        <ul className="mt-3 animate-[popIn_0.2s_ease-out] overflow-hidden rounded-2xl bg-base">
+        <ul className="mt-3 animate-[popIn_0.2s_ease-out] overflow-hidden rounded-2xl bg-page">
           {rows.map((r, i) => (
             <li
               key={r.label}

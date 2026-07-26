@@ -379,7 +379,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
             그만두기
           </button>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-base">
+        <div className="h-1.5 overflow-hidden rounded-full bg-page">
           <div
             className="h-full bg-pri transition-all"
             style={{ width: `${((cur + 1) / qs.length) * 100}%` }}
@@ -468,7 +468,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
             "rounded-xl px-6 py-2.5 text-sm font-semibold transition",
             answered
               ? "bg-pri text-white hover:bg-pri-deep"
-              : "cursor-not-allowed bg-base text-mut",
+              : "cursor-not-allowed bg-page text-mut",
           ].join(" ")}
         >
           {last ? "채점하기" : "다음"}
