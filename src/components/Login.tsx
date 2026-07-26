@@ -13,7 +13,7 @@ function friendly(msg: string): string {
 
 /**
  * 비밀번호 없는 이메일 인증 로그인.
- * 이메일 입력 → 인증 메일 발송 → 메일의 6자리 코드 입력(또는 메일 링크 클릭).
+ * 이메일 입력 → 인증 메일 발송 → 메일의 인증 코드 입력(또는 메일 링크 클릭).
  */
 export function Login() {
   const [email, setEmail] = useState("");
@@ -73,7 +73,7 @@ export function Login() {
         <p className="mt-2 text-sm text-sub">
           {step === "email"
             ? "비밀번호 없이 이메일 인증으로 로그인해요. 처음이면 자동으로 가입됩니다."
-            : "메일로 보낸 6자리 코드를 입력하세요. 메일 속 링크를 눌러도 로그인돼요."}
+            : "메일로 보낸 인증 코드를 입력하세요. 메일 속 링크를 눌러도 로그인돼요."}
         </p>
       </div>
 
@@ -107,12 +107,12 @@ export function Login() {
             inputMode="numeric"
             autoComplete="one-time-code"
             pattern="[0-9]*"
-            maxLength={6}
+            maxLength={8}
             autoFocus
-            placeholder="6자리 코드"
+            placeholder="인증 코드"
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ""))}
-            className="rounded-2xl bg-card px-4 py-3.5 text-center text-2xl font-bold tracking-[0.5em] text-ink shadow-soft outline-none focus:ring-2 focus:ring-pri/50"
+            className="rounded-2xl bg-card px-4 py-3.5 text-center text-2xl font-bold tracking-[0.3em] text-ink shadow-soft outline-none focus:ring-2 focus:ring-pri/50"
           />
           <button
             type="submit"
