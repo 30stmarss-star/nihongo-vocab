@@ -33,6 +33,7 @@ import {
   recordAccess,
   recordDone,
   savePlan,
+  savePlanLocal,
   saveSpeakLog,
   SPEAK_STEPS,
   streakOf,
@@ -157,14 +158,11 @@ export default function App() {
     setProgress(s.progress);
     if (s.band) {
       setBand(s.band);
-      const local = ensurePlan(uid, s.band, s.words, s.progress);
-      setPlan(local);
-      // 다른 기기에서 하던 코스가 더 최신이면 그걸 이어받는다
-      const remote = await syncPlan(uid, s.band, local);
-      if (remote) {
-        savePlan(uid, remote);
-        setPlan(remote);
-      }
+      // 서버를 '먼저' 확인한다. 로컬에 코스를 만들어 올린 뒤에 확인하면
+      // 다른 기기에서 하던 진행을 덮어쓴 걸 되읽게 된다.
+      const remote = await syncPlan(uid, s.band, loadPlan(uid, s.band));
+      if (remote) savePlanLocal(uid, remote);
+      setPlan(ensurePlan(uid, s.band, s.words, s.progress));
     }
     setPhase("ready");
   }
@@ -188,8 +186,10 @@ export default function App() {
       existing.newIds.concat(existing.reviewIds).some((id) => ids.has(id)) &&
       !(existing.testPassed && existing.day !== today);
     if (valid) return existing!;
+    // 갓 만든 빈 코스는 서버에 올리지 않는다 — 다른 기기에서 하던 진행을 덮어쓰게 된다.
+    // 서버 반영은 실제로 진행을 건드릴 때(updatePlan) 일어난다.
     const fresh = buildDailyPlan(poolFor(b, list), prog, b);
-    savePlan(uid, fresh);
+    savePlanLocal(uid, fresh);
     return fresh;
   }
 
@@ -350,6 +350,12 @@ export default function App() {
       .filter((g) => g.words.length > 0);
   }, [bookDisplay, bookRanks]);
 
+  // 시험에 섞어 낼 '예전에 외운 단어' — 오늘 목록에 없고, 이미 한 번 외운 것들
+  const pastWords = useMemo(() => {
+    const todayIds = new Set(planWords.list.map((w) => w.id));
+    return bandPool.filter((w) => !todayIds.has(w.id) && isKnown(progress[w.id]));
+  }, [bandPool, planWords.list, progress]);
+
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
 
@@ -377,7 +383,7 @@ export default function App() {
       setPlan((prev) => {
         if (!prev || prev.examItems?.length || prev.day !== plan.day || prev.band !== plan.band) return prev;
         const next = { ...prev, examItems: items };
-        savePlan(userId, next);
+        savePlanLocal(userId, next);
         return next;
       });
     });
@@ -404,7 +410,7 @@ export default function App() {
         if (!prev || prev.speakScenario || prev.day !== plan.day || prev.band !== plan.band)
           return prev;
         const next = { ...prev, speakScenario: s };
-        savePlan(userId, next);
+        savePlanLocal(userId, next);
         return next;
       });
     });
@@ -572,6 +578,7 @@ export default function App() {
       <main className="min-h-full">
         <DailyTest
           words={planWords.list}
+          pastWords={pastWords}
           bandWords={bandPool}
           progress={progress}
           examItems={plan.examItems}

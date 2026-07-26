@@ -354,6 +354,18 @@ export function loadPlan(uid: string | null, band: Band): DailyPlan | null {
   }
 }
 
+/**
+ * 로컬에만 저장. 서버는 건드리지 않는다.
+ * 갓 만든 빈 코스를 올려 다른 기기의 진행을 덮어쓰는 사고를 막는 용도.
+ */
+export function savePlanLocal(uid: string | null, plan: DailyPlan): void {
+  try {
+    localStorage.setItem(planKey(uid, plan.band), JSON.stringify(plan));
+  } catch {
+    /* noop */
+  }
+}
+
 export function savePlan(uid: string | null, plan: DailyPlan): void {
   const stamped = { ...plan, updatedAt: Date.now() };
   try {

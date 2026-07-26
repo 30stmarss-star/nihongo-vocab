@@ -27,9 +27,14 @@ import type { QuizResult } from "./Quiz";
  */
 
 const PASS_PCT = 90;
+/** 한 번에 푸는 문항 수. 한 단어당 한 문항이라 곧 출제 단어 수이기도 하다. */
+const TOTAL_Q = 30;
+/** 그중 '예전에 외운 단어' 몫 — 오늘 것만 풀면 단기기억으로 통과해버린다(간격 인출). */
+const PAST_Q = 6;
 
 interface Props {
   words: Word[]; // 오늘의 단어 전체
+  pastWords: Word[]; // 예전에 외운 단어 (섞어 낼 후보)
   bandWords: Word[]; // 오답 보기 생성용
   progress: ProgressMap; // 어려움/쉬움 판정용
   examItems?: ExamItem[]; // 미리 만들어 둔 문장형 문항
@@ -49,13 +54,32 @@ function toQuestion(item: ExamItem, w: Word): Question {
 }
 
 /**
- * 시험지 구성. 단어마다 서로 다른 유형을 뽑아 쓰고,
- * 어려운 단어에는 두 번째 유형을 하나 더 붙인다.
+ * 오늘 시험 볼 단어를 고른다. 오늘 배운 단어가 40개라도 전부 내지 않는다 —
+ * 한 번에 30문항이 집중이 유지되는 한계고, 못 뽑힌 단어는 내일 SRS가 다시 데려온다.
+ * 우선순위: 새 단어 → 어려운 복습 → 쉬운 복습. 여기에 예전 단어를 조금 섞는다.
  */
+export function pickExamWords(
+  today: Word[],
+  past: Word[],
+  progress: ProgressMap
+): Word[] {
+  const rank = (w: Word) => (isHard(w, progress) ? 0 : isRetired(progress[w.id]) ? 2 : 1);
+  const todaySorted = [...today].sort((a, b) => rank(a) - rank(b));
+
+  const pastCount = Math.min(PAST_Q, past.length);
+  const fromToday = todaySorted.slice(0, Math.max(0, TOTAL_Q - pastCount));
+  // 예전 단어는 오래 안 본 것부터
+  const fromPast = [...past]
+    .sort((a, b) => (progress[a.id]?.lastSeen ?? 0) - (progress[b.id]?.lastSeen ?? 0))
+    .slice(0, pastCount);
+
+  return [...fromToday, ...fromPast];
+}
+
+/** 시험지 구성 — 한 단어당 한 문항, 유형은 그 단어로 만들 수 있는 것 중 무작위. */
 function buildQuestions(
   words: Word[],
   pool: Word[],
-  progress: ProgressMap,
   examItems: ExamItem[] | undefined
 ): Question[] {
   const byKanji = new Map<string, ExamItem[]>();
@@ -67,28 +91,20 @@ function buildQuestions(
 
   const out: Question[] = [];
   for (const w of words) {
-    // 이 단어로 만들 수 있는 문항 후보 (만들 수 없는 유형은 null로 빠진다)
     const sentence = (byKanji.get(w.kanji) ?? []).map((it) => toQuestion(it, w));
     const rule = [readingQ(w, pool), writingQ(w, pool), meaningQ(w, pool), conjugateQ(w)].filter(
       Boolean
     ) as Question[];
     const candidates = shuffle([...sentence, ...shuffle(rule)]);
     // 후보가 하나도 없으면(가나 단어 등) 타이핑 문제로
-    if (!candidates.length) {
-      out.push(typeQ(w));
-      continue;
-    }
-    out.push(candidates[0]);
-    // 어려운 단어는 다른 유형으로 한 번 더 — 없으면 타이핑으로
-    if (isHard(w, progress)) {
-      out.push(candidates[1] ?? typeQ(w));
-    }
+    out.push(candidates[0] ?? typeQ(w));
   }
   return shuffle(out);
 }
 
 export function DailyTest({
   words,
+  pastWords,
   bandWords,
   progress,
   examItems,
@@ -96,6 +112,14 @@ export function DailyTest({
   onPassed,
   onExit,
 }: Props) {
+  // 이번 시험에 실제로 출제되는 단어 (오늘 것 일부 + 예전 것 조금)
+  const examWords = useMemo(
+    () => pickExamWords(words, pastWords, progress),
+    // 시험지를 만들 때 한 번만 정해지면 된다
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
+  const todayCount = examWords.filter((w) => words.some((x) => x.id === w.id)).length;
   const [phase, setPhase] = useState<"intro" | "quiz" | "drill" | "result">("intro");
   const [qs, setQs] = useState<Question[]>([]);
   const [cur, setCur] = useState(0);
@@ -107,18 +131,18 @@ export function DailyTest({
   const applied = useRef(false);
   const passedFired = useRef(false);
 
-  // 점수는 '단어 기준' — 한 단어를 두 번 물었으면 둘 다 맞아야 그 단어를 안 것으로 본다
+  // 점수는 출제된 단어 기준
   const score = useMemo(() => {
-    if (!words.length) return 0;
+    if (!examWords.length) return 0;
     let ok = 0;
-    for (const w of words) if (firstTry.current.get(w.id)) ok++;
-    return Math.round((ok / words.length) * 100);
+    for (const w of examWords) if (firstTry.current.get(w.id)) ok++;
+    return Math.round((ok / examWords.length) * 100);
   }, [phase]); // eslint-disable-line react-hooks/exhaustive-deps
 
   function start() {
     firstTry.current = new Map();
     applied.current = false;
-    setQs(buildQuestions(words, bandWords, progress, examItems));
+    setQs(buildQuestions(examWords, bandWords, examItems));
     setWrongQueue([]);
     setCur(0);
     setInput("");
@@ -156,7 +180,7 @@ export function DailyTest({
       } else {
         if (!applied.current) {
           applied.current = true;
-          onApplyResults(words.map((w) => ({ id: w.id, correct: !!firstTry.current.get(w.id) })));
+          onApplyResults(examWords.map((w) => ({ id: w.id, correct: !!firstTry.current.get(w.id) })));
         }
         if (wrongQueue.length) {
           setCur(0);
@@ -183,7 +207,7 @@ export function DailyTest({
 
   // ── 인트로 ──
   if (phase === "intro") {
-    const hardCount = words.filter((w) => isHard(w, progress)).length;
+    const pastCount = examWords.length - todayCount;
     return (
       <div className="mx-auto max-w-md px-5 pt-4">
         <button onClick={onExit} aria-label="나가기" className="grid h-9 w-9 place-items-center rounded-full bg-card text-sub shadow-soft">
@@ -193,13 +217,15 @@ export function DailyTest({
           <div className="text-4xl">📝</div>
           <h2 className="mt-3 text-xl font-extrabold text-ink">데일리 시험</h2>
           <p className="mt-3 text-sm leading-relaxed text-sub">
-            오늘 학습한 <b className="text-ink">{words.length}단어</b>를 여러 각도로 물어요.
+            <b className="text-ink">{examWords.length}문항</b> — 한 단어에 한 문제씩.
             <br />
             한자 읽기 · 표기 · 뜻 · 활용형 · 문맥 · 유의 표현 · 용법
-            {hardCount > 0 && (
+            <br />
+            오늘 단어 <b className="text-ink">{todayCount}</b>
+            {pastCount > 0 && (
               <>
-                <br />
-                어려워한 <b className="text-coral">{hardCount}단어</b>는 두 번 나와요.
+                {" "}
+                + 예전에 외운 단어 <b className="text-gold">{pastCount}</b>
               </>
             )}
             <br />
