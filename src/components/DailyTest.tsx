@@ -226,23 +226,11 @@ export function DailyTest({
           <div className="text-4xl">📝</div>
           <h2 className="mt-3 text-xl font-extrabold text-ink">데일리 시험</h2>
           <p className="mt-3 text-sm leading-relaxed text-sub">
-            <b className="text-ink">{examWords.length}문항</b> — 한 단어에 한 문제씩.
-            <br />
-            한자 읽기 · 표기 · 뜻 · 활용형 · 문맥 · 유의 표현 · 용법
-            <br />
-            오늘 단어 <b className="text-ink">{todayCount}</b>
-            {pastCount > 0 && (
-              <>
-                {" "}
-                + 예전에 외운 단어 <b className="text-gold">{pastCount}</b>
-              </>
-            )}
+            <b className="text-ink">{examWords.length}문항</b>
+            {pastCount > 0 && <> · 예전 단어 {pastCount}개 포함</>}
             <br />
             <b className="text-pri-deep">{PASS_PCT}점 이상</b>이면 통과!
           </p>
-          {!examItems?.length && (
-            <p className="mt-3 text-xs text-mut">문장형 문제는 아직 준비 중이라 단어 문제 위주로 나와요.</p>
-          )}
           <button
             onClick={start}
             className="mt-6 w-full rounded-2xl bg-pri py-3.5 font-bold text-white shadow-soft transition hover:bg-pri-deep active:scale-95"
