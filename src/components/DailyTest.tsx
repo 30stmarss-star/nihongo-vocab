@@ -49,10 +49,23 @@ interface Props {
 /** 이 단어를 아직 어려워하는가 (어려움 = 문항 2개) */
 const isHard = (w: Word, p: ProgressMap) => !isRetired(p[w.id]) && !isKnown(p[w.id]);
 
+/**
+ * 보기 표기를 사전 표준 표기로 맞춘다.
+ * 한 보기만 가나로 나오면(けが vs 風邪·元気·熱心) 그 자체가 힌트가 되어 문제가 망가진다.
+ */
+function normalizeChoices(choices: string[], dictionary: Word[]): string[] {
+  return choices.map((c) => {
+    const w = dictionary.find((x) => x.kana === c && x.kanji !== x.kana);
+    return w ? w.kanji : c;
+  });
+}
+
 /** 문장형 문항을 화면용 Question으로 */
-function toQuestion(item: ExamItem, w: Word): Question {
-  const base = { word: w, sentence: item.sentence, ko: item.ko, choices: item.choices, answer: item.answerIndex };
-  if (item.kind === "usage") return { kind: "usage", word: w, choices: item.choices, answer: item.answerIndex };
+function toQuestion(item: ExamItem, w: Word, dictionary: Word[]): Question {
+  // 통문장 보기(용법)는 손대지 않는다 — 단어 단위 보기만 표기를 맞춘다
+  const choices = item.kind === "usage" ? item.choices : normalizeChoices(item.choices, dictionary);
+  const base = { word: w, sentence: item.sentence, ko: item.ko, choices, answer: item.answerIndex };
+  if (item.kind === "usage") return { kind: "usage", word: w, choices, answer: item.answerIndex };
   return item.kind === "cloze" ? { kind: "cloze", ...base } : { kind: "synonym", ...base };
 }
 
@@ -94,7 +107,7 @@ function buildQuestions(
 
   const out: Question[] = [];
   for (const w of words) {
-    const sentence = (byKanji.get(w.kanji) ?? []).map((it) => toQuestion(it, w));
+    const sentence = (byKanji.get(w.kanji) ?? []).map((it) => toQuestion(it, w, pool));
     const rule = [readingQ(w, pool), writingQ(w, pool), meaningQ(w, pool), conjugateQ(w)].filter(
       Boolean
     ) as Question[];
@@ -247,7 +260,8 @@ export function DailyTest({
 
   // ── 결과 ──
   if (phase === "result") {
-    const wrongWords = words.filter((w) => !firstTry.current.get(w.id));
+    // 실제로 출제된 단어만 센다. 오늘 목록 전체를 세면 안 물어본 단어까지 '틀림'이 된다.
+    const wrongWords = examWords.filter((w) => !firstTry.current.get(w.id));
     return (
       <div className="mx-auto max-w-md px-5 pb-10 pt-4">
         <div className="rounded-3xl bg-card p-7 text-center shadow-pop">
@@ -262,7 +276,9 @@ export function DailyTest({
           </p>
           <div className="mt-5 flex justify-center gap-6 text-center">
             <div>
-              <div className="text-2xl font-extrabold text-mint">{words.length - wrongWords.length}</div>
+              <div className="text-2xl font-extrabold text-mint">
+                {examWords.length - wrongWords.length}
+              </div>
               <div className="text-xs text-mut">맞음</div>
             </div>
             <div>

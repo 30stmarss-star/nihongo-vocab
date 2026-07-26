@@ -76,8 +76,11 @@ function buildIndex(dictionary: Word[]): Index {
     const keys = new Set<string>();
     // 한자 표기 + 그 활용형
     if (hasKanji(w.kanji)) for (const f of surfaceForms(w, w.kanji)) keys.add(f);
-    // 가나 표기는 '원래 가나로 쓰는 단어'일 때만 (한자어의 독음은 제외)
-    if (w.kanji === w.kana) for (const f of surfaceForms(w, w.kana)) keys.add(f);
+    // 가나 표기: 원래 가나로 쓰는 단어는 그대로.
+    // 동사·형용사는 한자어라도 문장에서 가나로 쓰이는 일이 흔해서(風邪をひいた) 함께 넣는다.
+    // 활용형은 길고 구별력이 있어 오탐 위험이 낮다. 명사 독음(今→いま)은 계속 제외.
+    const inflects = w.type.kind === "verb" || w.type.kind === "i-adj" || w.type.kind === "na-adj";
+    if (w.kanji === w.kana || inflects) for (const f of surfaceForms(w, w.kana)) keys.add(f);
     for (const key of keys) {
       if (!key) continue;
       // 한 글자짜리는 한자일 때만 허용(가나 한 글자는 오탐 천지).
@@ -123,9 +126,11 @@ export function scanWords(
     let hit: { w: Word; len: number } | null = null;
     for (const { w, key } of candidates) {
       if (!text.startsWith(key, i)) continue;
-      // 가나로만 된 표기는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다.
+      // 짧은 가나 표기(2글자 이하)는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다.
+      // 「ています」의 …いま… 를 今(いま)으로 잡던 오탐이 이 규칙에 걸린다.
+      // 3글자 이상 가나(ひいた·たべます)는 구별력이 있어 조사 뒤에서도 그대로 매칭한다.
       // (한 글자라도 한자가 섞였으면 — お金·ご飯 — 경계가 분명하니 그대로 매칭)
-      if (!hasKanji(key) && i > 0 && KANA.test(text[i - 1])) continue;
+      if (!hasKanji(key) && key.length <= 2 && i > 0 && KANA.test(text[i - 1])) continue;
       // 한자 한 글자는 熟語(日本語)의 일부를 떼어내지 않도록 이웃이 한자면 건너뛴다
       if (key.length === 1) {
         const prev = i > 0 ? text[i - 1] : "";

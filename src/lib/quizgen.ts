@@ -112,13 +112,34 @@ export function readingQ(w: Word, pool: Word[]): Question | null {
   return { kind: "reading", word: w, ...withAnswer(w.kana, wrong) };
 }
 
-/** 표기 — 같은 글자 수 + 한 글자라도 겹치는 한자를 우선 오답으로 */
+/** 표기 문제용: 표제어 뒤에 붙은 오쿠리가나 꼬리 (暖かい → "かい") */
+const okurigana = (s: string) => s.match(/[ぁ-んー]+$/)?.[0] ?? "";
+
+/**
+ * 표기 — 오쿠리가나 꼬리가 같은 단어를 최우선 오답으로 쓴다.
+ * 「あたたかい」에 賑やか가 섞이면 꼴만 보고 지워지지만,
+ * 暖かい·親しい처럼 꼬리가 같으면 한자를 실제로 알아야 고를 수 있다.
+ */
 export function writingQ(w: Word, pool: Word[]): Question | null {
   if (w.kanji === w.kana || !/[一-龯]/.test(w.kanji)) return null;
   const chars = new Set([...w.kanji]);
+  const tail = okurigana(w.kanji);
   const usable = pool.filter((x) => x.id !== w.id && x.kanji !== w.kanji && /[一-龯]/.test(x.kanji));
+  const sameTail = tail ? usable.filter((x) => okurigana(x.kanji) === tail) : [];
   const ranked = [
-    ...shuffle(usable.filter((x) => x.kanji.length === w.kanji.length && [...x.kanji].some((c) => chars.has(c)))),
+    // 꼬리가 같고 글자 수도 같은 것 → 꼬리만 같은 것
+    ...shuffle(sameTail.filter((x) => x.kanji.length === w.kanji.length)),
+    ...shuffle(sameTail),
+    // 꼬리가 없는 단어(순한자어)면 겹치는 한자를 쓰는 쪽이 헷갈린다
+    ...shuffle(
+      usable.filter(
+        (x) =>
+          okurigana(x.kanji) === tail &&
+          x.kanji.length === w.kanji.length &&
+          [...x.kanji].some((c) => chars.has(c))
+      )
+    ),
+    ...shuffle(usable.filter((x) => okurigana(x.kanji) === tail && x.kanji.length === w.kanji.length)),
     ...shuffle(usable.filter((x) => x.kanji.length === w.kanji.length)),
     ...shuffle(usable),
   ];
