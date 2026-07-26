@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
@@ -29,6 +29,20 @@ interface Props {
 export function DailyLearn({ words, newCount, startIndex, dictionary, review, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, words.length - 1)));
   const [open, setOpen] = useState(false);
+  // 진행바를 잡고 끌어 원하는 카드로 바로 이동 (이전 버튼 여러 번 누르지 않게)
+  const barRef = useRef<HTMLDivElement>(null);
+  const [scrubbing, setScrubbing] = useState(false);
+
+  function seekTo(clientX: number) {
+    const box = barRef.current?.getBoundingClientRect();
+    if (!box || box.width === 0 || !words.length) return;
+    const ratio = Math.min(1, Math.max(0, (clientX - box.left) / box.width));
+    const next = Math.min(words.length - 1, Math.round(ratio * (words.length - 1)));
+    if (next !== idx) {
+      setOpen(false); // 카드가 바뀌면 답은 다시 가린다
+      setIdx(next);
+    }
+  }
 
   const w = words[idx];
   const isNew = idx < newCount;
@@ -74,15 +88,48 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col px-5 pb-8 pt-4">
-      {/* 상단: 닫기 + 진행바 */}
+      {/* 상단: 닫기 + 진행바(드래그해서 원하는 카드로 바로 이동) */}
       <div className="flex items-center gap-3">
         <button onClick={onExit} aria-label="나가기" className="grid h-9 w-9 place-items-center rounded-full bg-card text-sub shadow-soft">
           ✕
         </button>
-        <div className="h-3 flex-1 overflow-hidden rounded-full bg-card shadow-inner">
-          <div
-            className="h-full rounded-full bg-pri transition-all duration-300"
-            style={{ width: `${((idx + 1) / words.length) * 100}%` }}
+        <div
+          ref={barRef}
+          role="slider"
+          tabIndex={0}
+          aria-label="카드 이동"
+          aria-valuemin={1}
+          aria-valuemax={words.length}
+          aria-valuenow={idx + 1}
+          onPointerDown={(e) => {
+            e.currentTarget.setPointerCapture(e.pointerId);
+            setScrubbing(true);
+            seekTo(e.clientX);
+          }}
+          onPointerMove={(e) => scrubbing && seekTo(e.clientX)}
+          onPointerUp={() => setScrubbing(false)}
+          onPointerCancel={() => setScrubbing(false)}
+          onKeyDown={(e) => {
+            if (e.key === "ArrowLeft") go(-1);
+            if (e.key === "ArrowRight") go(1);
+          }}
+          style={{ touchAction: "none" }}
+          className="relative -my-3 flex flex-1 cursor-pointer items-center py-3"
+        >
+          <div className="h-3 w-full overflow-hidden rounded-full bg-card shadow-inner">
+            <div
+              className={["h-full rounded-full bg-pri", scrubbing ? "" : "transition-all duration-300"].join(" ")}
+              style={{ width: `${((idx + 1) / words.length) * 100}%` }}
+            />
+          </div>
+          {/* 잡는 손잡이 — 드래그할 수 있다는 걸 보이게 */}
+          <span
+            aria-hidden
+            className={[
+              "pointer-events-none absolute top-1/2 h-5 w-5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-pri ring-4 ring-base transition-transform",
+              scrubbing ? "scale-125" : "",
+            ].join(" ")}
+            style={{ left: `${((idx + 1) / words.length) * 100}%` }}
           />
         </div>
         <span className="w-12 text-right text-sm font-semibold text-sub">
