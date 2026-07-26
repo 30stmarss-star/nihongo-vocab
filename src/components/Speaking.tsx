@@ -3,7 +3,7 @@ import type { Word } from "../data/types";
 import type { SpeakTurn } from "../lib/daily";
 import { SPEAK_STEPS } from "../lib/daily";
 import { supabase } from "../lib/supabase";
-import { JpText } from "./JpText";
+import { ExampleLine } from "./ExampleLine";
 
 /** 오늘의 상황 — Claude가 매 사이클 새로 창작한다 */
 export interface SpeakScenario {
@@ -313,19 +313,23 @@ function EvalCard({
     <div className="rounded-3xl bg-card p-5 shadow-soft">
       <span className={`rounded-full px-2.5 py-1 text-xs font-bold ${badge.cls}`}>{badge.label}</span>
 
-      <div className="mt-3 rounded-2xl bg-base p-3.5">
+      <div className="mt-3">
         <div className="text-[11px] font-bold uppercase tracking-wide text-mut">모범 답안</div>
-        <div className="mt-1 text-lg font-bold leading-relaxed text-ink">
-          <JpText text={ev.correctJp} dictionary={dictionary} onShowCard={onShowCard} />
-        </div>
-        <div className="mt-0.5 text-sm text-pri-deep">{ev.correctKana}</div>
-        {ev.correctKo && <div className="mt-0.5 text-xs text-mut">🔈 {ev.correctKo}</div>}
+        {/* 예문과 같은 줄 — 문장 분해를 누르면 조사까지 전부 탭할 수 있다 */}
+        <ExampleLine
+          ex={{
+            jp: ev.correctJp,
+            kana: ev.correctKana,
+            ko: ev.correctKo ? `🔈 ${ev.correctKo}` : "",
+          }}
+          dictionary={dictionary}
+          onShowCard={onShowCard}
+        />
       </div>
 
       <div className="mt-3 text-sm leading-relaxed text-ink">
         <MdLite text={ev.feedback} />
       </div>
-      <div className="mt-2 text-[11px] text-mut">일본어 단어를 탭하면 단어 카드가 떠요</div>
     </div>
   );
 }

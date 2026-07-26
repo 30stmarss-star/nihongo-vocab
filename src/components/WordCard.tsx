@@ -10,12 +10,14 @@ export function WordCard({
   x,
   y,
   inBook,
+  saving,
   onAddBook,
 }: {
   word: Word;
   x: number;
   y: number;
   inBook?: boolean;
+  saving?: boolean;
   onAddBook?: () => void;
 }) {
   // 깨진/누락 데이터에도 카드가 죽지 않도록 방어
@@ -102,16 +104,16 @@ export function WordCard({
         {onAddBook && (
           <button
             type="button"
-            disabled={inBook}
+            disabled={inBook || saving}
             onClick={onAddBook}
             className={[
               "pointer-events-auto mt-3 w-full rounded-xl py-2.5 text-sm font-bold transition active:scale-[0.98]",
               inBook
                 ? "bg-mint-soft text-mint"
-                : "bg-pri text-white shadow-soft hover:bg-pri-deep",
+                : "bg-pri text-white shadow-soft hover:bg-pri-deep disabled:opacity-60",
             ].join(" ")}
           >
-            {inBook ? "✓ 단어장에 있어요" : "📥 단어장에 넣기"}
+            {inBook ? "✓ 단어장에 있어요" : saving ? "카드 만드는 중…" : "📥 단어장에 넣기"}
           </button>
         )}
       </div>

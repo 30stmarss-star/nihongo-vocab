@@ -17,6 +17,7 @@ import {
   loadScannedQueue,
   loadSession,
   loadWordbookLocal,
+  lookupWord,
   persistProgress,
   persistSettings,
   syncWordbook,
@@ -98,6 +99,8 @@ export default function App() {
   // 단어장: 하루 코스를 마친 단어 + 촬영 단어 (id → 담은 날짜)
   const [wordbook, setWordbook] = useState<Wordbook>(new Map());
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
+  // 사전에 없는 단어의 카드를 만들어 저장하는 중
+  const [savingCard, setSavingCard] = useState(false);
 
   // ── 인증 / 초기 로드 ──
   useEffect(() => {
@@ -431,18 +434,32 @@ export default function App() {
 
   const focusMode = FOCUS_VIEWS.includes(view);
 
+  /**
+   * 단어장에 담기. 사전에 없는 단어(문장에서 주워 온 토큰)면 먼저 정식 카드를
+   * 만들어 DB에 넣고, 그 진짜 단어를 담는다.
+   */
+  async function addCardToBook(w: Word) {
+    if (!isTokenWord(w)) {
+      setWordbook((prev) => addToWordbook(userId, [w.id], prev));
+      return;
+    }
+    setSavingCard(true);
+    const real = await lookupWord(w.kanji, w.kana);
+    setSavingCard(false);
+    if (!real) return;
+    setWords((prev) => (prev.some((x) => x.id === real.id) ? prev : [...prev, real]));
+    setWordbook((prev) => addToWordbook(userId, [real.id], prev));
+    setCard((c) => (c && c.word.id === w.id ? { ...c, word: real } : c));
+  }
+
   // 단어 카드 오버레이 (모든 화면 공용) — 카드에서 바로 단어장에 넣을 수 있다
   const cardOverlay = (
     <CardOverlay
       card={card}
       setCard={setCard}
       inBook={card ? wordbook.has(card.word.id) : undefined}
-      onAddBook={
-        // 사전에 없는 임시 토큰(LLM 분해 결과)은 단어장에 넣을 수 없다
-        card && !isTokenWord(card.word)
-          ? () => setWordbook((prev) => addToWordbook(userId, [card.word.id], prev))
-          : undefined
-      }
+      saving={savingCard}
+      onAddBook={card ? () => void addCardToBook(card.word) : undefined}
     />
   );
 
@@ -692,11 +709,13 @@ function CardOverlay({
   card,
   setCard,
   inBook,
+  saving,
   onAddBook,
 }: {
   card: { word: Word; x: number; y: number } | null;
   setCard: (c: null) => void;
   inBook?: boolean;
+  saving?: boolean;
   onAddBook?: () => void;
 }) {
   if (!card) return null;
@@ -708,7 +727,14 @@ function CardOverlay({
         className="fixed inset-0 z-40 cursor-default"
         onClick={() => setCard(null)}
       />
-      <WordCard word={card.word} x={card.x} y={card.y} inBook={inBook} onAddBook={onAddBook} />
+      <WordCard
+        word={card.word}
+        x={card.x}
+        y={card.y}
+        inBook={inBook}
+        saving={saving}
+        onAddBook={onAddBook}
+      />
     </>
   );
 }
