@@ -248,6 +248,13 @@ export function Speaking(props: Props) {
       {/* 입력 바 */}
       {!finished && current && (
         <div className="sticky bottom-0 -mx-5 bg-base/95 px-5 pb-[calc(1rem_+_env(safe-area-inset-bottom))] pt-2 backdrop-blur">
+          {/* 지금 무엇을 쓰라고 했는지 — 키보드가 올라와도 계속 보이게 입력창에 붙여 둔다 */}
+          <div className="mb-2 max-h-24 overflow-y-auto rounded-2xl bg-pri-soft px-3.5 py-2.5">
+            <div className="text-[11px] font-bold text-pri">
+              {current.role === "me" ? "🙋 내 차례" : "🎭 상대방 차례 (내가 작문)"}
+            </div>
+            <div className="mt-0.5 text-[13px] leading-relaxed text-pri-deep">{current.instruction}</div>
+          </div>
           <div className="flex items-end gap-2 rounded-3xl bg-card p-2 shadow-pop">
             <textarea
               value={input}
@@ -259,6 +266,13 @@ export function Speaking(props: Props) {
                 }
               }}
               rows={2}
+              onFocus={() =>
+                // 키보드가 올라오면서 스레드가 가려지지 않게 맨 아래로 붙인다
+                setTimeout(
+                  () => scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight }),
+                  250
+                )
+              }
               placeholder="일본어를 한글 발음으로 써보세요 (예: 스미마셍, 코레 쿠다사이)"
               className="max-h-28 flex-1 resize-none bg-transparent px-3 py-2 text-[15px] text-ink outline-none placeholder:text-mut"
             />

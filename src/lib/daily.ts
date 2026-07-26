@@ -38,6 +38,14 @@ export function addDays(key: string, days: number): string {
 
 export const NEW_PER_DAY = 20; // 하루 새 단어
 export const REVIEW_CAP = 20; // 하루 복습 상한(만기분 중 오래 밀린 순)
+/**
+ * 복습 칸 중 '어려움(아직 못 외운)' 단어가 차지할 수 있는 최대 비율.
+ * 상한이 없으면 유독 안 외워지는 몇 개가 매일 복습을 독차지하고,
+ * 익어가던 단어들은 복습 시점을 놓쳐 같이 무너진다(leech 문제).
+ */
+const HARD_SHARE = 0.6;
+/** 이만큼 반복해서 틀리면 '집중 단어' — 접근을 바꿔야 한다는 신호 */
+export const LEECH_SEEN = 8;
 
 export interface Scenario {
   id: string;
@@ -61,6 +69,16 @@ export const SCENARIOS: Scenario[] = [
 
 /** 작문 스피킹 총 소절 수: 4턴 × (내 대사 + 상대 대사) = 작문 8문장 */
 export const SPEAK_STEPS = 8;
+
+/** LLM이 만든 문장형 문항 (문맥 규정 / 유의 표현 / 용법) */
+export interface ExamItem {
+  kanji: string; // 어느 단어의 문항인지
+  kind: "cloze" | "synonym" | "usage";
+  sentence: string;
+  ko: string;
+  choices: string[];
+  answerIndex: number;
+}
 
 /** 작문 스피킹 한 소절(내 대사 또는 상대 대사) */
 export interface SpeakTurn {
@@ -92,9 +110,23 @@ export interface DailyPlan {
   speakTurns?: SpeakTurn[]; // 진행된 대화(이어하기용)
   speakDone: boolean;
   speakSkipped?: boolean; // 오프라인 등으로 건너뜀
+  examItems?: ExamItem[]; // 백그라운드로 미리 만들어 둔 문장형 문제
   testPassed: boolean;
   bestScore: number | null; // 시험 최고 점수(%)
   completedDay: string | null; // 시험 통과한 날(KST) — 달성일
+  updatedAt?: number; // 마지막 저장 시각 — 기기 간 동기화에서 최신 쪽을 고르는 기준
+}
+
+/** 아직 손대지 않은 코스인가 (기기 간 병합에서 서버 것에 양보할지 판단) */
+export function isPlanUntouched(p: DailyPlan): boolean {
+  return (
+    p.learnIndex === 0 &&
+    !p.learnDone &&
+    p.speakStep === 0 &&
+    !p.speakDone &&
+    !p.speakSkipped &&
+    !p.testPassed
+  );
 }
 
 /** 새 사이클 구성: 새 단어 NEW_PER_DAY + 복습 만기분(오래 밀린 순) REVIEW_CAP */
@@ -107,14 +139,20 @@ export function buildDailyPlan(
   const day = dayKey(now);
 
   // 복습: 만기된 것 중 많이 밀린 순 + 중요도(freq 1 우선) 보정
-  const due = pool
-    .filter((w) => isDue(progress[w.id], now))
-    .sort((a, b) => {
-      const ra = overdueRatio(progress[a.id]!, now) * (2 - ((a.freq ?? 2) - 1) * 0.3);
-      const rb = overdueRatio(progress[b.id]!, now) * (2 - ((b.freq ?? 2) - 1) * 0.3);
-      return rb - ra;
-    })
-    .slice(0, REVIEW_CAP);
+  const weight = (w: Word) => overdueRatio(progress[w.id]!, now) * (2 - ((w.freq ?? 2) - 1) * 0.3);
+  const dueAll = pool.filter((w) => isDue(progress[w.id], now)).sort((a, b) => weight(b) - weight(a));
+
+  // 어려움은 상한까지만 — 나머지 칸은 익어가는 단어에 양보한다
+  const hardCap = Math.round(REVIEW_CAP * HARD_SHARE);
+  const hard: Word[] = [];
+  const rest: Word[] = [];
+  for (const w of dueAll) (isKnown(progress[w.id]) ? rest : hard).push(w);
+  const due = [...hard.slice(0, hardCap), ...rest].slice(0, REVIEW_CAP);
+  // 상한 때문에 칸이 남으면 밀린 어려움 단어로 채운다
+  if (due.length < REVIEW_CAP) {
+    const used = new Set(due.map((w) => w.id));
+    due.push(...hard.filter((w) => !used.has(w.id)).slice(0, REVIEW_CAP - due.length));
+  }
 
   // 새 단어: 한 번도 안 본 것 중 중요도 우선 + 약간 섞기
   const fresh = pool.filter((w) => {
@@ -187,6 +225,41 @@ export async function generateScenario(
   }
 }
 
+/**
+ * 하루치 단어의 문장형 문항을 미리 만들어 온다 (코스 시작 시 백그라운드).
+ * 실패하면 null — 시험은 규칙 기반 문항만으로도 성립한다.
+ */
+export async function generateExam(
+  words: Array<{ kanji: string; kana: string; meaning: string; pos: string }>,
+  level: string
+): Promise<ExamItem[] | null> {
+  if (!(CLOUD && supabase) || !words.length) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke("generate-exam", {
+      body: { level, words },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(String(data.error));
+    const raw = Array.isArray(data?.items) ? data.items : [];
+    const items: ExamItem[] = raw.filter(
+      (it: ExamItem) =>
+        it &&
+        typeof it.kanji === "string" &&
+        Array.isArray(it.choices) &&
+        it.choices.length === 4 &&
+        it.answerIndex >= 0 &&
+        it.answerIndex < 4 &&
+        ["cloze", "synonym", "usage"].includes(it.kind) &&
+        // 문맥 규정은 빈칸이 실제로 있어야 문제가 된다
+        (it.kind !== "cloze" || it.sentence.includes("＿"))
+    );
+    return items.length ? items : null;
+  } catch (e) {
+    console.warn("[exam] 문항 미리 생성 실패(규칙 문항으로 진행):", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 export function pushRecentScenario(uid: string | null, title: string): void {
   try {
     const list = loadRecentScenarios(uid).filter((t) => t !== title);
@@ -217,10 +290,61 @@ export function loadPlan(uid: string | null, band: Band): DailyPlan | null {
 }
 
 export function savePlan(uid: string | null, plan: DailyPlan): void {
+  const stamped = { ...plan, updatedAt: Date.now() };
   try {
-    localStorage.setItem(planKey(uid, plan.band), JSON.stringify(plan));
+    localStorage.setItem(planKey(uid, plan.band), JSON.stringify(stamped));
   } catch {
     /* noop */
+  }
+  // 다른 기기에서도 이어서 하도록 서버에도 올린다 (테이블 없으면 조용히 로컬만)
+  if (CLOUD && supabase && uid) {
+    void supabase
+      .from("daily_plan")
+      .upsert(
+        {
+          user_id: uid,
+          band: plan.band,
+          plan: stamped,
+          updated_at: new Date(stamped.updatedAt).toISOString(),
+        },
+        { onConflict: "user_id,band" }
+      )
+      .then(({ error }) => {
+        if (error) console.warn("[plan] 서버 저장 실패(로컬은 저장됨):", error.message);
+      });
+  }
+}
+
+/**
+ * 서버에 있는 코스 진행 상태를 가져와 로컬과 비교한다.
+ * 서버 쪽이 더 최신이거나 로컬이 아직 손도 안 댄 코스면 서버 것을 쓴다.
+ * 채택할 게 없으면 null.
+ */
+export async function syncPlan(
+  uid: string | null,
+  band: Band,
+  local: DailyPlan | null
+): Promise<DailyPlan | null> {
+  if (!(CLOUD && supabase && uid)) return null;
+  try {
+    const { data, error } = await supabase
+      .from("daily_plan")
+      .select("plan")
+      .eq("user_id", uid)
+      .eq("band", band)
+      .maybeSingle();
+    if (error) throw error;
+    const remote = data?.plan as DailyPlan | undefined;
+    if (!remote?.day || remote.band !== band) return null;
+
+    if (!local) return remote;
+    // 로컬이 방금 만들어진 빈 코스면 서버에서 하던 걸 이어받는다
+    if (isPlanUntouched(local) && !isPlanUntouched(remote)) return remote;
+    if ((remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) return remote;
+    return null;
+  } catch (e) {
+    console.warn("[plan] 서버 동기화 생략:", e instanceof Error ? e.message : e);
+    return null;
   }
 }
 
@@ -343,6 +467,19 @@ export function grassGrid(weeks: number, today: string = dayKey()): string[][] {
     grid.push(col);
   }
   return grid;
+}
+
+/**
+ * '집중 단어': 여러 번 만났는데도 여전히 못 외운 단어.
+ * 그냥 반복해선 안 뚫리니 접근을 바꾸라고(한자 어원 보기 등) 알려준다.
+ */
+export function leechWords(pool: Word[], progress: ProgressMap): Word[] {
+  return pool
+    .filter((w) => {
+      const p = progress[w.id];
+      return !!p && !isKnown(p) && !isRetired(p) && p.seenCount >= LEECH_SEEN;
+    })
+    .sort((a, b) => (progress[b.id]?.seenCount ?? 0) - (progress[a.id]?.seenCount ?? 0));
 }
 
 /** JLPT 정복률: 현재 밴드 풀에서 외운(체크 이상) 비율 */

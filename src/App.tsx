@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { BANDS, type Band, type Word } from "./data/types";
+import { BANDS, typeLabel, type Band, type Word } from "./data/types";
 import {
   defaultProgress,
   isKnown,
@@ -24,6 +24,7 @@ import {
 } from "./lib/store";
 import {
   buildDailyPlan,
+  generateExam,
   generateScenario,
   loadPlan,
   loadRecentScenarios,
@@ -34,6 +35,7 @@ import {
   savePlan,
   streakOf,
   syncActivity,
+  syncPlan,
   dayKey,
   type ActivityLog,
   type DailyPlan,
@@ -148,7 +150,14 @@ export default function App() {
     setProgress(s.progress);
     if (s.band) {
       setBand(s.band);
-      setPlan(ensurePlan(uid, s.band, s.words, s.progress));
+      const local = ensurePlan(uid, s.band, s.words, s.progress);
+      setPlan(local);
+      // 다른 기기에서 하던 코스가 더 최신이면 그걸 이어받는다
+      const remote = await syncPlan(uid, s.band, local);
+      if (remote) {
+        savePlan(uid, remote);
+        setPlan(remote);
+      }
     }
     setPhase("ready");
   }
@@ -321,6 +330,37 @@ export default function App() {
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
 
+  // 새 코스가 생기면 시험 문장형 문항을 백그라운드로 미리 만들어 둔다.
+  // (실패해도 규칙 기반 문항만으로 시험은 성립한다)
+  const examReq = useRef<string | null>(null);
+  useEffect(() => {
+    if (!plan || plan.examItems?.length || plan.testPassed) return;
+    if (!(CLOUD && userId) || !planWords.list.length) return;
+    const key = `${plan.band}.${plan.day}.${plan.newIds[0] ?? ""}`;
+    if (examReq.current === key) return;
+    examReq.current = key;
+    const lvl = BANDS.find((b) => b.id === plan.band)?.label ?? plan.band;
+    const payload = planWords.list.map((w) => ({
+      kanji: w.kanji,
+      kana: w.kana,
+      meaning: w.meaning,
+      pos: typeLabel(w.type),
+    }));
+    void generateExam(payload, lvl).then((items) => {
+      if (!items) {
+        examReq.current = null;
+        return;
+      }
+      setPlan((prev) => {
+        if (!prev || prev.examItems?.length || prev.day !== plan.day || prev.band !== plan.band) return prev;
+        const next = { ...prev, examItems: items };
+        savePlan(userId, next);
+        return next;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, userId, planWords.list.length]);
+
   // 새 코스가 생기면 오늘의 작문 상황을 미리 창작해 홈에 보여준다.
   // (실패해도 스피킹을 열 때 다시 시도하므로 조용히 넘어간다)
   const scenarioReq = useRef<string | null>(null);
@@ -474,6 +514,8 @@ export default function App() {
         <DailyTest
           words={planWords.list}
           bandWords={bandPool}
+          progress={progress}
+          examItems={plan.examItems}
           onApplyResults={applyQuizResults}
           onPassed={onTestPassed}
           onExit={() => setView("home")}
