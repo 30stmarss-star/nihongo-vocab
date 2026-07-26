@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BANDS, typeLabel, type Band, type Word } from "./data/types";
 import {
+  applyRating,
   defaultProgress,
   isKnown,
   isRetired,
@@ -8,6 +9,7 @@ import {
   markRetired,
   markUnknown,
   touch,
+  type Progress,
   type ProgressMap,
 } from "./lib/srs";
 import {
@@ -257,7 +259,7 @@ export default function App() {
     setView("home");
   }
 
-  function update(id: string, fn: typeof markKnown) {
+  function update(id: string, fn: (p: Progress, now: number) => Progress) {
     setProgress((prev) => {
       const np = fn(prev[id] ?? defaultProgress(), Date.now());
       const next = { ...prev, [id]: np };
@@ -548,7 +550,8 @@ export default function App() {
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
           }
           onSeen={onSeen}
-          onRate={(id, r) => update(id, r === "hard" ? markUnknown : markKnown)}
+          progress={progress}
+          onRate={(id, r) => update(id, (p, now) => applyRating(p, r, now))}
           onProgress={(i) => updatePlan({ learnIndex: i })}
           onDone={() => {
             if (!isReview) updatePlan({ learnDone: true });
@@ -723,7 +726,9 @@ export default function App() {
                       setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
                     }
                     onSetLevel={(id, lv) =>
-                      update(id, lv === "done" ? markRetired : lv === "easy" ? markKnown : markUnknown)
+                      update(id, (p, now) =>
+                        lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)
+                      )
                     }
                   />
                 </section>

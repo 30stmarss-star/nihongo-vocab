@@ -2,9 +2,30 @@ import { useEffect, useRef, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
+import type { ProgressMap } from "../lib/srs";
+import { dayKey } from "../lib/daily";
 import { ExampleLine } from "./ExampleLine";
 import { KanjiInsight } from "./KanjiInsight";
 import { ConjugationTable } from "./ConjugationTable";
+
+/** 그 선택을 며칠 전에 했는지 (KST 날짜 기준) */
+function daysAgo(ms: number): number {
+  const utc = (key: string) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return Date.UTC(y, m - 1, d);
+  };
+  return Math.round((utc(dayKey()) - utc(dayKey(ms))) / 86400000);
+}
+
+function agoLabel(ms: number | undefined): string {
+  if (!ms) return "";
+  const d = daysAgo(ms);
+  if (d <= 0) return "오늘";
+  if (d === 1) return "어제";
+  if (d < 7) return `${d}일 전`;
+  if (d < 28) return `${Math.floor(d / 7)}주 전`;
+  return `${Math.floor(d / 30)}개월 전`;
+}
 
 /**
  * 오늘의 단어 — 카드 한 장씩 집중 학습.
@@ -17,6 +38,7 @@ interface Props {
   newCount: number; // words 앞쪽 newCount개가 새 단어
   startIndex: number;
   dictionary: Word[]; // 예문 속 단어 탭 → 카드용 사전
+  progress: ProgressMap; // 지난번에 어려움/쉬움 중 뭘 골랐는지 보여주기 위함
   onShowCard: (word: Word, x: number, y: number) => void;
   onSeen: (id: string) => void; // 카드가 처음 화면에 나옴(도입 기록)
   onRate: (id: string, rating: "hard" | "easy") => void; // 어려움/쉬움 평가
@@ -26,7 +48,7 @@ interface Props {
   onExit: () => void;
 }
 
-export function DailyLearn({ words, newCount, startIndex, dictionary, review, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
+export function DailyLearn({ words, newCount, startIndex, dictionary, progress, review, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, words.length - 1)));
   const [open, setOpen] = useState(false);
   // 진행바를 잡고 끌어 원하는 카드로 바로 이동 (이전 버튼 여러 번 누르지 않게)
@@ -66,6 +88,13 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
       </div>
     );
   }
+
+  // 이 단어를 지난번에 봤을 때 내가 뭘 골랐는지 (없으면 아직 평가한 적 없는 단어)
+  const p = progress[w.id];
+  const prevRating = p?.lastRating;
+  const prevAgo = agoLabel(p?.ratedAt);
+  const hardN = p?.hardCount ?? 0;
+  const easyN = p?.easyCount ?? 0;
 
   const pre = boundPrefix(w);
   const trad = tradForm(w.kanji);
@@ -161,6 +190,19 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
             <span className="rounded-full bg-page px-2.5 py-1 text-xs font-semibold text-sub">
               {w.level} · {typeLabel(w.type)}
             </span>
+            {/* 지난번에 내가 고른 답 — 답을 가리지 않으면서 "저번에 어땠지"를 되짚게 한다 */}
+            {prevRating && (
+              <span
+                className={[
+                  "ml-auto shrink-0 rounded-full px-2.5 py-1 text-xs font-bold",
+                  prevRating === "hard"
+                    ? "bg-coral-soft text-coral"
+                    : "bg-mint-soft text-mint",
+                ].join(" ")}
+              >
+                {prevRating === "hard" ? "😵" : "😎"} {prevAgo}
+              </span>
+            )}
           </div>
 
           <div className="flex grow flex-col items-center justify-center py-6 text-center">
@@ -180,6 +222,13 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
                 )}
                 {trad && <div className="mt-1 text-sm text-gold">한국식 정자 {trad}</div>}
                 <div className="mt-3 text-2xl font-bold text-pri-deep">{w.meaning}</div>
+                {hardN + easyN > 0 && (
+                  <div className="mt-2 text-[11px] font-semibold text-mut">
+                    지금까지 <span className="text-coral">어려움 {hardN}</span> ·{" "}
+                    <span className="text-mint">쉬움 {easyN}</span>
+                    {prevRating && ` · ${prevAgo} ${prevRating === "hard" ? "어려움" : "쉬움"} 선택`}
+                  </div>
+                )}
                 {hanja.length > 0 && (
                   <div className="mt-4 flex flex-wrap justify-center gap-1.5">
                     {hanja.map((h, i) => (
@@ -226,16 +275,23 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
           </div>
         ) : (
         <>
+        {/* 지난번 고른 쪽에 테두리를 둘러 어느 버튼을 눌렀었는지 바로 보이게 한다 */}
         <div className="flex gap-3">
           <button
             onClick={() => rate("hard")}
-            className="flex-1 rounded-2xl bg-coral py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+            className={[
+              "relative flex-1 rounded-2xl bg-coral py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95",
+              prevRating === "hard" ? "ring-2 ring-coral ring-offset-2 ring-offset-page" : "",
+            ].join(" ")}
           >
             😵 어려움
           </button>
           <button
             onClick={() => rate("easy")}
-            className="flex-1 rounded-2xl bg-mint py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+            className={[
+              "relative flex-1 rounded-2xl bg-mint py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95",
+              prevRating === "easy" ? "ring-2 ring-mint ring-offset-2 ring-offset-page" : "",
+            ].join(" ")}
           >
             😎 쉬움
           </button>
@@ -249,7 +305,10 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, review, on
             ← 이전
           </button>
           <span className="text-[11px] text-mut">
-            어려움은 복습에 빨리 돌아와요{last ? " · 마지막 카드예요" : ""}
+            {prevRating
+              ? `${prevAgo} ${prevRating === "hard" ? "어려움" : "쉬움"}으로 골랐어요`
+              : "어려움은 복습에 빨리 돌아와요"}
+            {last ? " · 마지막 카드예요" : ""}
           </span>
           <button
             onClick={() => go(1)}

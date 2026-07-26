@@ -10,10 +10,19 @@ import type { Word } from "../data/types";
  *   방금 본 단어가 또 나오지 않도록 다양성을 확보한다.
  */
 
+/** 내가 직접 고른 평가 (카드 학습의 어려움/쉬움, 단어장 왼쪽 원) */
+export type Rating = "hard" | "easy";
+
 export interface Progress {
   mastery: number; // 0(전혀 모름) ~ 5(완전 암기)
   lastSeen: number; // epoch ms, 마지막으로 학습지에 나오거나 안다/모른다 표시한 시각
   seenCount: number;
+  // ↓ "내가 지난번에 뭘 골랐지?"를 보여주기 위한 기록. 시험 채점처럼 자동으로 오르내리는
+  //   숙련도와 달리, 내가 손으로 누른 것만 남는다. (예전 데이터엔 없으므로 전부 선택적)
+  lastRating?: Rating;
+  ratedAt?: number; // 그 선택을 한 시각(epoch ms)
+  hardCount?: number;
+  easyCount?: number;
 }
 
 export type ProgressMap = Record<string, Progress>;
@@ -58,6 +67,7 @@ export function isRetired(p: Progress | undefined): boolean {
 /** 왕체크 표시: 학습지에서 완전히 빼되 '외운 단어'에는 남긴다. */
 export function markRetired(p: Progress, now: number): Progress {
   return {
+    ...p,
     mastery: RETIRED_MASTERY,
     lastSeen: now,
     seenCount: p.seenCount + 1,
@@ -67,6 +77,7 @@ export function markRetired(p: Progress, now: number): Progress {
 /** 왕체크 해제: 숙련도를 최고 단계(5)로 되돌린다 — 복습 주기에만 다시 들어간다. */
 export function markUnretire(p: Progress, now: number): Progress {
   return {
+    ...p,
     mastery: 5,
     lastSeen: now,
     seenCount: p.seenCount + 1,
@@ -85,8 +96,8 @@ export function introduce(p: Progress | undefined, now: number): Progress {
  * (변화가 없으면 같은 객체를 그대로 돌려줘 불필요한 저장을 피한다.)
  */
 export function touch(p: Progress | undefined, now: number): Progress {
-  if (!p || p.seenCount === 0) return { mastery: 0, lastSeen: now, seenCount: 1 };
-  return { mastery: p.mastery, lastSeen: now, seenCount: p.seenCount };
+  if (!p || p.seenCount === 0) return { ...(p ?? {}), mastery: 0, lastSeen: now, seenCount: 1 };
+  return { ...p, mastery: p.mastery, lastSeen: now, seenCount: p.seenCount };
 }
 
 /** 복습 만기 여부 — 하루 코스에서 '오늘의 복습' 후보를 고를 때 사용 */
@@ -133,6 +144,7 @@ export function weightFor(p: Progress | undefined, now: number): number {
 /** 안다 표시 */
 export function markKnown(p: Progress, now: number): Progress {
   return {
+    ...p,
     mastery: Math.min(5, p.mastery + 1),
     lastSeen: now,
     seenCount: p.seenCount + 1,
@@ -142,9 +154,26 @@ export function markKnown(p: Progress, now: number): Progress {
 /** 체크 해제(모름으로 되돌리기): 숙련도를 0으로 리셋해 짧은 간격 뒤 다시 등장하게 한다. */
 export function markUnknown(p: Progress, now: number): Progress {
   return {
+    ...p,
     mastery: 0,
     lastSeen: now,
     seenCount: p.seenCount + 1,
+  };
+}
+
+/**
+ * 내가 손으로 고른 어려움/쉬움. 숙련도는 기존과 똑같이 움직이고(쉬움=안다, 어려움=모름),
+ * 거기에 "무엇을 몇 번 골랐는지"를 덧붙여 다음에 이 단어를 볼 때 되짚어 볼 수 있게 한다.
+ * 시험 채점(자동)은 이 기록을 남기지 않는다 — 내가 누른 것만 남아야 의미가 있다.
+ */
+export function applyRating(p: Progress, r: Rating, now: number): Progress {
+  const base = r === "easy" ? markKnown(p, now) : markUnknown(p, now);
+  return {
+    ...base,
+    lastRating: r,
+    ratedAt: now,
+    hardCount: (p.hardCount ?? 0) + (r === "hard" ? 1 : 0),
+    easyCount: (p.easyCount ?? 0) + (r === "easy" ? 1 : 0),
   };
 }
 
