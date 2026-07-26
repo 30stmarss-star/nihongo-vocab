@@ -93,6 +93,63 @@ function buildIndex(dictionary: Word[]): Index {
   return m;
 }
 
+/**
+ * 문장을 '사전에 있는 단어' 조각으로 쪼갠다. 화면 렌더와 해설(단어 풀이)이
+ * 같은 결과를 쓰도록 여기 하나로 모아 둔다.
+ */
+export function scanWords(
+  text: string,
+  dictionary: Word[],
+  tokens?: Token[] | null
+): Array<{ text: string; word?: Word }> {
+  const out: Array<{ text: string; word?: Word }> = [];
+
+  // 1) LLM 분해 결과가 있으면 그대로 쓴다 (조사·부호는 링크로 만들지 않음)
+  if (tokens && tokens.length) {
+    for (const t of tokens) {
+      if (!t?.surface) continue;
+      const plain = t.pos === "조사" || t.pos === "부호" || !t.meaning;
+      out.push(plain ? { text: t.surface } : { text: t.surface, word: tokenToWord(t, dictionary) });
+    }
+    return out;
+  }
+
+  // 2) 규칙 기반 최장 일치
+  const index = buildIndex(dictionary);
+  let buf = "";
+  let i = 0;
+  while (i < text.length) {
+    const candidates = index.get(text[i]) ?? [];
+    let hit: { w: Word; len: number } | null = null;
+    for (const { w, key } of candidates) {
+      if (!text.startsWith(key, i)) continue;
+      // 가나로만 된 표기는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다.
+      // (한 글자라도 한자가 섞였으면 — お金·ご飯 — 경계가 분명하니 그대로 매칭)
+      if (!hasKanji(key) && i > 0 && KANA.test(text[i - 1])) continue;
+      // 한자 한 글자는 熟語(日本語)의 일부를 떼어내지 않도록 이웃이 한자면 건너뛴다
+      if (key.length === 1) {
+        const prev = i > 0 ? text[i - 1] : "";
+        const next = text[i + 1] ?? "";
+        if (hasKanji(prev) || hasKanji(next)) continue;
+      }
+      if (!hit || key.length > hit.len) hit = { w, len: key.length };
+    }
+    if (hit) {
+      if (buf) {
+        out.push({ text: buf });
+        buf = "";
+      }
+      out.push({ text: text.slice(i, i + hit.len), word: hit.w });
+      i += hit.len;
+    } else {
+      buf += text[i];
+      i++;
+    }
+  }
+  if (buf) out.push({ text: buf });
+  return out;
+}
+
 export function JpText({
   text,
   dictionary,
@@ -104,54 +161,7 @@ export function JpText({
   tokens?: Token[] | null;
   onShowCard: (word: Word, x: number, y: number) => void;
 }) {
-  const parts = useMemo(() => {
-    const out: Array<{ text: string; word?: Word }> = [];
-
-    // 1) LLM 분해 결과가 있으면 그대로 쓴다 (조사·부호는 링크로 만들지 않음)
-    if (tokens && tokens.length) {
-      for (const t of tokens) {
-        if (!t?.surface) continue;
-        const plain = t.pos === "조사" || t.pos === "부호" || !t.meaning;
-        out.push(plain ? { text: t.surface } : { text: t.surface, word: tokenToWord(t, dictionary) });
-      }
-      return out;
-    }
-
-    // 2) 규칙 기반 최장 일치
-    const index = buildIndex(dictionary);
-    let buf = "";
-    let i = 0;
-    while (i < text.length) {
-      const candidates = index.get(text[i]) ?? [];
-      let hit: { w: Word; len: number } | null = null;
-      for (const { w, key } of candidates) {
-        if (!text.startsWith(key, i)) continue;
-        // 가나로만 된 표기는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다.
-        // (한 글자라도 한자가 섞였으면 — お金·ご飯 — 경계가 분명하니 그대로 매칭)
-        if (!hasKanji(key) && i > 0 && KANA.test(text[i - 1])) continue;
-        // 한자 한 글자는 熟語(日本語)의 일부를 떼어내지 않도록 이웃이 한자면 건너뛴다
-        if (key.length === 1) {
-          const prev = i > 0 ? text[i - 1] : "";
-          const next = text[i + 1] ?? "";
-          if (hasKanji(prev) || hasKanji(next)) continue;
-        }
-        if (!hit || key.length > hit.len) hit = { w, len: key.length };
-      }
-      if (hit) {
-        if (buf) {
-          out.push({ text: buf });
-          buf = "";
-        }
-        out.push({ text: text.slice(i, i + hit.len), word: hit.w });
-        i += hit.len;
-      } else {
-        buf += text[i];
-        i++;
-      }
-    }
-    if (buf) out.push({ text: buf });
-    return out;
-  }, [text, dictionary, tokens]);
+  const parts = useMemo(() => scanWords(text, dictionary, tokens), [text, dictionary, tokens]);
 
   return (
     <>

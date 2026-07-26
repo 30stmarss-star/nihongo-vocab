@@ -15,6 +15,7 @@ import {
   type Question,
 } from "../lib/quizgen";
 import type { QuizResult } from "./Quiz";
+import { scanWords } from "./JpText";
 
 /**
  * 데일리 시험 — 오늘의 단어를 여러 각도에서 묻는다.
@@ -150,9 +151,13 @@ export function DailyTest({
     setPhase("quiz");
   }
 
-  const list = phase === "drill" ? wrongQueue : qs;
-  const q = list[cur];
+  // 오답 다지기는 항상 큐의 맨 앞을 푼다
+  const q = phase === "drill" ? wrongQueue[0] : qs[cur];
 
+  /**
+   * 채점만 하고 큐는 건드리지 않는다.
+   * (여기서 큐를 바꾸면 해설이 떠 있는 사이 화면 뒤에서 문항이 넘어가 버린다)
+   */
   function judge(picked?: number) {
     if (!q || judged) return;
     const ok = q.kind === "type" ? readingMatches(input, q.word.kana, q.word.kanji) : picked === q.answer;
@@ -161,40 +166,44 @@ export function DailyTest({
       // 같은 단어를 여러 번 물으면 '전부 맞아야' 아는 것으로 친다
       const prev = firstTry.current.get(q.word.id);
       firstTry.current.set(q.word.id, prev === undefined ? ok : prev && ok);
-    }
-
-    if (!ok) {
-      setWrongQueue((p) => (phase === "quiz" ? [...p, q] : [...p.slice(0, cur), ...p.slice(cur + 1), q]));
-    } else if (phase === "drill") {
-      setWrongQueue((p) => [...p.slice(0, cur), ...p.slice(cur + 1)]);
+      // 이전 문제로 돌아가 다시 풀 수 있으니 중복으로 쌓이지 않게 한다
+      if (!ok) setWrongQueue((p) => (p.includes(q) ? p : [...p, q]));
     }
     setJudged({ ok, picked });
   }
 
+  /** '계속'을 눌렀을 때만 다음 문항으로 넘어간다 */
   function next() {
+    const wasOk = !!judged?.ok;
     setJudged(null);
     setInput("");
+
     if (phase === "quiz") {
       if (cur + 1 < qs.length) {
         setCur(cur + 1);
-      } else {
-        if (!applied.current) {
-          applied.current = true;
-          onApplyResults(examWords.map((w) => ({ id: w.id, correct: !!firstTry.current.get(w.id) })));
-        }
-        if (wrongQueue.length) {
-          setCur(0);
-          setPhase("drill");
-        } else {
-          setPhase("result");
-        }
+        return;
       }
-    } else if (judged?.ok && wrongQueue.length === 0) {
-      setPhase("result");
-    } else {
-      setCur(0);
+      if (!applied.current) {
+        applied.current = true;
+        onApplyResults(examWords.map((w) => ({ id: w.id, correct: !!firstTry.current.get(w.id) })));
+      }
+      if (wrongQueue.length) setPhase("drill");
+      else setPhase("result");
+      return;
     }
+
+    // 다지기: 맞히면 큐에서 빼고, 틀리면 맨 뒤로 돌린다
+    const [head, ...rest] = wrongQueue;
+    const nextQueue = wasOk ? rest : [...rest, head];
+    setWrongQueue(nextQueue);
+    if (!nextQueue.length) setPhase("result");
   }
+
+  // 낼 문항이 없는데 풀이 화면에 머무르면 빈 화면이 된다 — 결과로 넘긴다
+  useEffect(() => {
+    if ((phase === "quiz" || phase === "drill") && !q) setPhase("result");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, q]);
 
   const passed = score >= PASS_PCT;
   useEffect(() => {
@@ -310,7 +319,7 @@ export function DailyTest({
   }
 
   // ── 문제 풀이 ──
-  if (!q) return null;
+  if (!q) return null; // 위 효과가 곧 결과 화면으로 넘긴다
 
   return (
     <div className="mx-auto flex min-h-full max-w-md flex-col px-5 pb-8 pt-4">
@@ -338,7 +347,10 @@ export function DailyTest({
       </div>
 
       <div className="mt-6 grow">
-        <div key={`${phase}-${cur}-${q.word.id}-${q.kind}`} className="animate-[cardIn_0.2s_ease-out] rounded-3xl bg-card p-6 shadow-pop">
+        <div
+          key={`${phase}-${phase === "drill" ? wrongQueue.length : cur}-${q.word.id}-${q.kind}`}
+          className="animate-[cardIn_0.2s_ease-out] rounded-3xl bg-card p-6 shadow-pop"
+        >
           <Prompt q={q} />
           {q.kind === "type" ? (
             <>
@@ -420,7 +432,8 @@ export function DailyTest({
                 {q.label} — {q.hint}
               </div>
             )}
-            {/* 다른 보기들도 무슨 단어였는지 알려준다 — 헷갈린 짝을 같이 정리하게 */}
+            {/* 지문 속 단어 풀이 + 다른 보기들이 무슨 단어였는지 */}
+            <SentenceGlossary q={q} dictionary={bandWords} />
             {q.kind !== "type" && (
               <ChoiceGlossary q={q} picked={judged.picked} dictionary={bandWords} />
             )}
@@ -428,16 +441,80 @@ export function DailyTest({
         )}
       </div>
 
-      {judged && (
-        <button
-          onClick={next}
-          className={[
-            "mt-5 w-full rounded-2xl py-3.5 font-bold text-white shadow-soft transition active:scale-95",
-            judged.ok ? "bg-mint hover:brightness-105" : "bg-coral hover:brightness-105",
-          ].join(" ")}
-        >
-          계속 →
-        </button>
+      <div className="mt-5 flex items-center gap-3">
+        {/* 방금 지나온 문제를 다시 보고 싶을 때 (본 시험에서만 — 다지기는 큐가 돌아간다) */}
+        {phase === "quiz" && cur > 0 && (
+          <button
+            onClick={() => {
+              setJudged(null);
+              setInput("");
+              setCur((c) => Math.max(0, c - 1));
+            }}
+            className="rounded-2xl bg-card px-4 py-3.5 text-sm font-bold text-sub shadow-soft transition active:scale-95"
+          >
+            ← 이전 문제
+          </button>
+        )}
+        {judged && (
+          <button
+            onClick={next}
+            className={[
+              "flex-1 rounded-2xl py-3.5 font-bold text-white shadow-soft transition active:scale-95",
+              judged.ok ? "bg-mint hover:brightness-105" : "bg-coral hover:brightness-105",
+            ].join(" ")}
+          >
+            계속 →
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * 문장형 문제 해설 — 지문에 나온 단어들의 독음·뜻을 정리해 준다.
+ * 정답을 맞혀도 문장을 통째로 이해 못 하고 넘어가는 걸 막는다.
+ */
+function SentenceGlossary({ q, dictionary }: { q: Question; dictionary: Word[] }) {
+  // 빈칸 문제는 정답을 채워 완성된 문장으로 보여준다
+  const sentence =
+    q.kind === "cloze"
+      ? q.sentence.replace("＿", q.choices[q.answer])
+      : q.kind === "synonym"
+        ? q.sentence
+        : q.kind === "usage"
+          ? q.choices[q.answer]
+          : "";
+
+  const words = useMemo(() => {
+    if (!sentence) return [];
+    const seen = new Set<string>();
+    const out: Word[] = [];
+    for (const part of scanWords(sentence.replace(/[【】]/g, ""), dictionary)) {
+      if (part.word && !seen.has(part.word.id)) {
+        seen.add(part.word.id);
+        out.push(part.word);
+      }
+    }
+    return out;
+  }, [sentence, dictionary]);
+
+  if (!sentence) return null;
+
+  return (
+    <div className="mt-3 border-t border-ink/10 pt-2.5">
+      <div className="text-[11px] font-bold text-mut">문장 풀이</div>
+      <div className="mt-1 text-sm font-bold leading-relaxed text-ink">{sentence}</div>
+      {words.length > 0 && (
+        <ul className="mt-1.5 space-y-0.5">
+          {words.map((w) => (
+            <li key={w.id} className="flex items-baseline gap-1.5 text-xs">
+              <span className="font-bold text-ink">{w.kanji}</span>
+              {w.kanji !== w.kana && <span className="text-pri-deep">{w.kana}</span>}
+              <span className="text-sub">{w.meaning}</span>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   );
