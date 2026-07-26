@@ -47,6 +47,11 @@ export function Speaking(props: Props) {
 
   const answered = turns.filter((t) => t.eval).length;
   const current = turns.find((t) => !t.eval) ?? null;
+  // 평가가 달린 마지막 소절 (스크롤 기준점)
+  let lastEvalIndex = -1;
+  turns.forEach((t, i) => {
+    if (t.eval) lastEvalIndex = i;
+  });
   const finished = answered >= SPEAK_STEPS;
 
   const focusPayload = focusWords.map((w) => ({ jp: w.kanji, kana: w.kana, ko: w.meaning }));
@@ -100,9 +105,20 @@ export function Speaking(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // 새 평가가 오면 그 카드의 '처음'이 보이게 맞춘다 — 맨 아래로 내리면
+  // 긴 해설의 끝만 보여서 정작 판정과 모범답안을 놓친다.
+  const lastEvalRef = useRef<HTMLDivElement>(null);
+  const prevAnswered = useRef(0);
   useEffect(() => {
-    scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: "smooth" });
-  }, [turns, loading]);
+    const box = scrollRef.current;
+    if (!box) return;
+    if (answered > prevAnswered.current && lastEvalRef.current) {
+      box.scrollTo({ top: Math.max(0, lastEvalRef.current.offsetTop - 8), behavior: "smooth" });
+    } else {
+      box.scrollTo({ top: box.scrollHeight, behavior: "smooth" });
+    }
+    prevAnswered.current = answered;
+  }, [turns, loading, answered]);
 
   async function submit() {
     if (!current || !input.trim() || loading) return;
@@ -175,7 +191,7 @@ export function Speaking(props: Props) {
       </div>
 
       {/* 대화 스레드 */}
-      <div ref={scrollRef} className="mt-3 flex-1 space-y-3 overflow-y-auto pb-4">
+      <div ref={scrollRef} className="relative mt-3 flex-1 space-y-3 overflow-y-auto pb-4">
         {intro && (
           <div className="rounded-2xl bg-pri-soft px-4 py-3 text-sm leading-relaxed text-pri-deep">
             🎬 {intro}
@@ -204,8 +220,12 @@ export function Speaking(props: Props) {
               </div>
             )}
 
-            {/* 평가 */}
-            {t.eval && <EvalCard turn={t} dictionary={props.dictionary} onShowCard={props.onShowCard} />}
+            {/* 평가 — 가장 최근 것에 ref를 달아 스크롤 기준으로 쓴다 */}
+            {t.eval && (
+              <div ref={i === lastEvalIndex ? lastEvalRef : undefined}>
+                <EvalCard turn={t} dictionary={props.dictionary} onShowCard={props.onShowCard} />
+              </div>
+            )}
           </div>
         ))}
 
