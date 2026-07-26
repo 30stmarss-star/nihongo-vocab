@@ -71,7 +71,11 @@ const EXTRACT_PROMPT = `이 이미지들은 일본어 학습 자료입니다(교
 규칙:
 - 손글씨는 최대한 정확히 판독하세요. 획이 애매하면 문맥상 가장 그럴듯한 정식 표기로 복원합니다. 확신이 없어도 추측한 표기를 넣되, 이미지에 없는 단어를 지어내지는 마세요.
 - 조사·어미 같은 기능어만 있는 항목, 사람 이름/고유명사는 제외. 의미 있는 명사·동사·형용사·부사·관용표현 위주로.
-- kanji=표제어(한자 없으면 kana와 동일), kana=히라가나 독음.
+- kanji=표제어, kana=히라가나 독음.
+- **표제어는 사전에 실리는 표준 표기로 적으세요.** 이미지에 가나로만 적혀 있어도, 보통 한자로 쓰는
+  단어면 한자로 복원합니다. (だいじょうぶ→大丈夫, ぜんぜん→全然, べんきょう→勉強)
+  원래 가나로만 쓰는 말(こちらこそ·とんでもない·ちょっと 등)은 가나 그대로 두고, kanji와 kana를 같게 합니다.
+- kanji를 빈 문자열로 두지 마세요. 한자가 없는 단어면 kana와 똑같이 채웁니다.
 - meaning(뜻)과 예문 ko는 **반드시 한국어(한글)로만**. 영어 단어를 쓰지 마세요.
 - 동사는 1군(5단)/2군(1단)/3군(불규칙=する·来る류)으로 분류해 verbGroup에, 동사가 아니면 null.
 - hanja: 각 구성 한자의 한국식 훈독을 "훈 음"으로("食"→"먹을 식"). 가나 전용 단어는 빈 배열.
@@ -108,6 +112,8 @@ const POS = ["verb", "i-adj", "na-adj", "noun", "adverb", "expression"];
 
 function isValid(w: Cand): boolean {
   if (!w || typeof w.kanji !== "string" || typeof w.kana !== "string") return false;
+  // 표제어를 비워 보내는 경우가 있다 — 독음으로 메워 빈 칸이 화면에 뜨지 않게
+  if (!w.kanji.trim() && w.kana.trim()) w.kanji = w.kana;
   if (!JP.test(w.kanji) && !KANA.test(w.kanji)) return false; // 표제어에 일본어
   if (LATIN.test(w.kanji) || LATIN.test(w.kana)) return false; // 영문 오염 차단
   if (!KANA.test(w.kana)) return false;

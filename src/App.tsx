@@ -19,6 +19,7 @@ import {
   lookupWord,
   persistProgress,
   persistSettings,
+  refreshProgress,
   syncWordbook,
   type Wordbook,
 } from "./lib/store";
@@ -168,6 +169,7 @@ export default function App() {
   }
 
   // 창을 다시 보게 될 때 서버와 맞춘다 — PC를 켜둔 채 폰으로 진행한 경우를 잡는다.
+  // 코스 진행뿐 아니라 단어 난이도·단어장까지 다시 받아야 폰에서 한 변화가 보인다.
   // (코스 화면에 들어가 있는 동안은 방해하지 않는다)
   useEffect(() => {
     if (!(CLOUD && userId) || !band) return;
@@ -180,6 +182,9 @@ export default function App() {
           setPlan(merged);
         }
       });
+      void refreshProgress(userId).then((p) => p && setProgress(p));
+      void syncWordbook(userId).then(setWordbook);
+      void syncActivity(userId).then(setActivity);
     }
     document.addEventListener("visibilitychange", onFocus);
     window.addEventListener("focus", onFocus);

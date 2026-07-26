@@ -199,18 +199,24 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
                   </button>
                   <div className="flex-1 space-y-1.5">
                     <div className="flex gap-1.5">
-                      <input
-                        value={r.cand.kanji}
-                        onChange={(e) => edit(i, { kanji: e.target.value })}
-                        placeholder="표제어"
-                        className="w-[42%] rounded-lg border border-line bg-card px-2 py-1.5 text-base text-ink outline-none focus:border-pri"
-                      />
-                      <input
-                        value={r.cand.kana}
-                        onChange={(e) => edit(i, { kana: e.target.value })}
-                        placeholder="독음(히라가나)"
-                        className="flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-pri"
-                      />
+                      <label className="w-[42%]">
+                        <span className="mb-0.5 block text-[10px] font-bold text-mut">표제어(한자)</span>
+                        <input
+                          value={r.cand.kanji}
+                          onChange={(e) => edit(i, { kanji: e.target.value })}
+                          placeholder="예: 大丈夫"
+                          className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-base text-ink outline-none focus:border-pri"
+                        />
+                      </label>
+                      <label className="flex-1">
+                        <span className="mb-0.5 block text-[10px] font-bold text-mut">독음(히라가나)</span>
+                        <input
+                          value={r.cand.kana}
+                          onChange={(e) => edit(i, { kana: e.target.value })}
+                          placeholder="예: だいじょうぶ"
+                          className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-pri"
+                        />
+                      </label>
                     </div>
                     <input
                       value={r.cand.meaning}
