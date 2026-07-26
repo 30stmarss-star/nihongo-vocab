@@ -392,10 +392,55 @@ export function savePlan(uid: string | null, plan: DailyPlan): void {
   }
 }
 
+/** 같은 코스인가 (사이클이 다르면 병합하면 안 된다) */
+function sameCycle(a: DailyPlan, b: DailyPlan): boolean {
+  return a.band === b.band && a.day === b.day && a.newIds[0] === b.newIds[0];
+}
+
+/** 진행의 '양'. 어느 쪽이 앞서 있는지 판단할 때 쓴다. */
+function progressScore(p: DailyPlan): number {
+  return (
+    p.learnIndex +
+    (p.learnDone ? 1000 : 0) +
+    p.speakStep * 10 +
+    (p.speakDone || p.speakSkipped ? 2000 : 0) +
+    (p.testPassed ? 5000 : 0)
+  );
+}
+
 /**
- * 서버에 있는 코스 진행 상태를 가져와 로컬과 비교한다.
- * 서버 쪽이 더 최신이거나 로컬이 아직 손도 안 댄 코스면 서버 것을 쓴다.
- * 채택할 게 없으면 null.
+ * 두 기기의 진행을 항목별 최댓값으로 합친다.
+ *
+ * 시각 비교만으로는 되돌아감을 못 막는다 — 오프라인이던 기기가 뒤늦게 켜져
+ * 뭔가를 건드리면 옛 진행이 '새 시각'을 달고 최신을 덮어쓴다.
+ * 최댓값으로 합치면 어느 쪽에서 오든 진행은 앞으로만 간다.
+ */
+export function mergePlans(a: DailyPlan, b: DailyPlan): DailyPlan {
+  // 작문 대화는 더 많이 진행된 쪽을 통째로 가져온다(부분 병합은 대화를 망친다)
+  const speakFrom = (b.speakStep ?? 0) > (a.speakStep ?? 0) ? b : a;
+  return {
+    ...a,
+    learnIndex: Math.max(a.learnIndex, b.learnIndex),
+    learnDone: a.learnDone || b.learnDone,
+    speakStep: Math.max(a.speakStep, b.speakStep),
+    speakScenario: a.speakScenario ?? b.speakScenario,
+    speakLogId: a.speakLogId ?? b.speakLogId,
+    speakIntro: speakFrom.speakIntro,
+    speakTurns: speakFrom.speakTurns,
+    speakDone: a.speakDone || b.speakDone,
+    speakSkipped: a.speakSkipped || b.speakSkipped,
+    testPassed: a.testPassed || b.testPassed,
+    bestScore: Math.max(a.bestScore ?? 0, b.bestScore ?? 0) || null,
+    completedDay: a.completedDay ?? b.completedDay,
+    examItems: a.examItems?.length ? a.examItems : b.examItems,
+    updatedAt: Math.max(a.updatedAt ?? 0, b.updatedAt ?? 0),
+  };
+}
+
+/**
+ * 서버의 코스 진행을 가져와 로컬과 합친다. 합친 결과가 서버보다 앞서 있으면
+ * 서버에도 되올려 두 기기가 같은 지점에서 이어지게 한다.
+ * 로컬을 바꿀 필요가 없으면 null.
  */
 export async function syncPlan(
   uid: string | null,
@@ -415,10 +460,19 @@ export async function syncPlan(
     if (!remote?.day || remote.band !== band) return null;
 
     if (!local) return remote;
-    // 로컬이 방금 만들어진 빈 코스면 서버에서 하던 걸 이어받는다
-    if (isPlanUntouched(local) && !isPlanUntouched(remote)) return remote;
-    if ((remote.updatedAt ?? 0) > (local.updatedAt ?? 0)) return remote;
-    return null;
+
+    // 사이클이 다르면 합치지 않는다. 손 안 댄 쪽을 버리고, 둘 다 진행됐다면
+    // 더 많이 나간 쪽을 남긴다(빈 코스가 진행 중인 코스를 밀어내지 않게).
+    if (!sameCycle(local, remote)) {
+      if (isPlanUntouched(local) && !isPlanUntouched(remote)) return remote;
+      if (isPlanUntouched(remote)) return null;
+      return progressScore(remote) > progressScore(local) ? remote : null;
+    }
+
+    const merged = mergePlans(local, remote);
+    // 합친 결과가 서버보다 앞서면 서버를 끌어올린다
+    if (progressScore(merged) > progressScore(remote)) savePlan(uid, merged);
+    return progressScore(merged) > progressScore(local) ? merged : null;
   } catch (e) {
     console.warn("[plan] 서버 동기화 생략:", e instanceof Error ? e.message : e);
     return null;

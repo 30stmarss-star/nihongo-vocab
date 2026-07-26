@@ -167,6 +167,28 @@ export default function App() {
     setPhase("ready");
   }
 
+  // 창을 다시 보게 될 때 서버와 맞춘다 — PC를 켜둔 채 폰으로 진행한 경우를 잡는다.
+  // (코스 화면에 들어가 있는 동안은 방해하지 않는다)
+  useEffect(() => {
+    if (!(CLOUD && userId) || !band) return;
+    function onFocus() {
+      if (document.visibilityState !== "visible") return;
+      if (FOCUS_VIEWS.includes(view)) return;
+      void syncPlan(userId, band!, loadPlan(userId, band!)).then((merged) => {
+        if (merged) {
+          savePlanLocal(userId, merged);
+          setPlan(merged);
+        }
+      });
+    }
+    document.addEventListener("visibilitychange", onFocus);
+    window.addEventListener("focus", onFocus);
+    return () => {
+      document.removeEventListener("visibilitychange", onFocus);
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [userId, band, view]);
+
   function poolFor(b: Band, list: Word[] = words): Word[] {
     const levels = BANDS.find((x) => x.id === b)!.levels;
     return list.filter((w) => levels.includes(w.level));
