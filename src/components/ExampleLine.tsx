@@ -53,7 +53,6 @@ export function ExampleLine({
           {loading ? "문장 분해 중…" : "🔬 문장 통째로 분해하기"}
         </button>
       )}
-      {tokens && <div className="mt-2 text-[11px] text-mint">✓ 분해됨 — 조사까지 전부 탭할 수 있어요</div>}
       {error && <div className="mt-2 text-[11px] text-coral">{error}</div>}
     </div>
   );
