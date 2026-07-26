@@ -275,6 +275,26 @@ export default function App() {
     );
   }, [words, wordbook, progress]);
 
+  // 단어장 표시 목록은 '세션 스냅샷': 탭에 들어올 때만 재정렬하고,
+  // 안에서 체크를 바꿔도 행이 제자리에 있게 한다(체크 풀자마자 튀지 않게).
+  // 새로 추가된 단어만 뒤에 붙는다.
+  const [bookDisplay, setBookDisplay] = useState<Word[]>([]);
+  const prevViewRef = useRef<View>(view);
+  useEffect(() => {
+    const wasBook = prevViewRef.current === "wordbook";
+    prevViewRef.current = view;
+    if (view !== "wordbook") return;
+    if (!wasBook) {
+      setBookDisplay(bookWords);
+      return;
+    }
+    setBookDisplay((prev) => {
+      const shown = new Set(prev.map((w) => w.id));
+      const additions = bookWords.filter((w) => !shown.has(w.id));
+      return additions.length ? [...prev, ...additions] : prev;
+    });
+  }, [bookWords, view]);
+
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
 
@@ -465,7 +485,7 @@ export default function App() {
           onNewCycle={newCycle}
         />
       ) : view === "wordbook" ? (
-        bookWords.length === 0 ? (
+        bookDisplay.length === 0 ? (
           <div className="rounded-3xl bg-card px-6 py-14 text-center text-sm text-mut shadow-soft">
             아직 단어장이 비어 있어요.
             <br />
@@ -475,7 +495,7 @@ export default function App() {
           <>
             <div className="mb-3 flex items-center gap-2">
               <p className="text-xs leading-relaxed text-mut">
-                내 단어 {bookWords.length}개. 꾹 누르면 정답,{" "}
+                내 단어 {bookDisplay.length}개. 꾹 누르면 정답,{" "}
                 <b className="text-sub">단어를 빠르게 두 번 탭</b>하면{" "}
                 <b className="text-gold">완전 암기</b> 체크!
               </p>
@@ -487,7 +507,7 @@ export default function App() {
               </button>
             </div>
             <WordTable
-              words={bookWords}
+              words={bookDisplay}
               progress={progress}
               mode={bookReverse ? "ko" : "jp"}
               onShowCard={(word, x, y) =>
