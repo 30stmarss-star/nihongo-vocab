@@ -20,6 +20,7 @@ import {
   persistProgress,
   persistSettings,
   syncWordbook,
+  type Wordbook,
 } from "./lib/store";
 import {
   buildDailyPlan,
@@ -33,6 +34,7 @@ import {
   savePlan,
   streakOf,
   syncActivity,
+  addDays,
   dayKey,
   type ActivityLog,
   type DailyPlan,
@@ -50,6 +52,7 @@ import { Home } from "./components/Home";
 import { DailyLearn } from "./components/DailyLearn";
 import { DailyTest } from "./components/DailyTest";
 import { Speaking } from "./components/Speaking";
+import { isTokenWord } from "./components/JpText";
 import { BUILD_ID, forceUpdate } from "./lib/version";
 
 type View =
@@ -85,8 +88,8 @@ export default function App() {
   // 단어장 방향: false=일본어 보기(뜻 가림), true=뜻 보기(단어 가림)
   const [bookReverse, setBookReverse] = useState(false);
   const [scanned, setScanned] = useState<Set<string>>(new Set());
-  // 단어장: 하루 코스를 마친 단어 + 촬영 단어의 id 집합
-  const [wordbook, setWordbook] = useState<Set<string>>(new Set());
+  // 단어장: 하루 코스를 마친 단어 + 촬영 단어 (id → 담은 날짜)
+  const [wordbook, setWordbook] = useState<Wordbook>(new Map());
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
 
   // ── 인증 / 초기 로드 ──
@@ -268,10 +271,14 @@ export default function App() {
     // 단어장 = 하루 코스를 마친 단어 + 촬영 단어 + (예전 방식에서) 체크했던 단어.
     // 레벨(밴드)과 무관하게 전부 보여준다 — 내가 거쳐온 단어 모음이니까.
     const list = words.filter((w) => wordbook.has(w.id) || isKnown(progress[w.id]));
-    // 완전 암기는 하단으로. 그 외에는 최근 본 순.
+    // 완전 암기는 하단으로. 그 외에는 담은 날짜 최신순(같은 날이면 최근 본 순).
     const rank = (w: Word) => (isRetired(progress[w.id]) ? 1 : 0);
+    const day = (w: Word) => wordbook.get(w.id) ?? "";
     return list.sort(
-      (a, b) => rank(a) - rank(b) || (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
+      (a, b) =>
+        rank(a) - rank(b) ||
+        day(b).localeCompare(day(a)) ||
+        (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
     );
   }, [words, wordbook, progress]);
 
@@ -294,6 +301,35 @@ export default function App() {
       return additions.length ? [...prev, ...additions] : prev;
     });
   }, [bookWords, view]);
+
+  // 단어장을 '배운 날짜'로 묶는다 — 언제 만난 단어인지가 기억을 돕는다.
+  // 완전 암기한 단어는 날짜와 무관하게 맨 아래 한 묶음으로.
+  const bookGroups = useMemo(() => {
+    const byDay = new Map<string, Word[]>();
+    const done: Word[] = [];
+    for (const w of bookDisplay) {
+      if (isRetired(progress[w.id])) {
+        done.push(w);
+        continue;
+      }
+      const d = wordbook.get(w.id) ?? "";
+      const arr = byDay.get(d) ?? [];
+      arr.push(w);
+      byDay.set(d, arr);
+    }
+    const today = dayKey();
+    const yesterday = addDays(today, -1);
+    const label = (d: string) =>
+      !d ? "이전에 담은 단어" : d === today ? "오늘" : d === yesterday ? "어제" : d.replaceAll("-", ". ");
+    // 날짜 있는 그룹 최신순 → 날짜 없는 그룹 → 완전 암기
+    const dated = [...byDay.entries()].filter(([d]) => d).sort((a, b) => b[0].localeCompare(a[0]));
+    const undated = byDay.get("");
+    return [
+      ...dated.map(([d, list]) => ({ key: d, label: label(d), words: list, done: false })),
+      ...(undated?.length ? [{ key: "old", label: label(""), words: undated, done: false }] : []),
+      ...(done.length ? [{ key: "done", label: "⭐ 완전 암기", words: done, done: true }] : []),
+    ];
+  }, [bookDisplay, wordbook, progress]);
 
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
@@ -375,7 +411,8 @@ export default function App() {
       setCard={setCard}
       inBook={card ? wordbook.has(card.word.id) : undefined}
       onAddBook={
-        card
+        // 사전에 없는 임시 토큰(LLM 분해 결과)은 단어장에 넣을 수 없다
+        card && !isTokenWord(card.word)
           ? () => setWordbook((prev) => addToWordbook(userId, [card.word.id], prev))
           : undefined
       }
@@ -524,16 +561,33 @@ export default function App() {
                 {bookReverse ? "한국어 → 일본어" : "일본어 → 한국어"} ⇄
               </button>
             </div>
-            <WordTable
-              words={bookDisplay}
-              progress={progress}
-              mode={bookReverse ? "ko" : "jp"}
-              onShowCard={(word, x, y) =>
-                setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-              }
-              onRetire={(id) => update(id, markRetired)}
-              onUnretire={(id) => update(id, markUnretire)}
-            />
+            <div className="space-y-4">
+              {bookGroups.map((g) => (
+                <section key={g.key}>
+                  <div className="mb-1.5 flex items-baseline gap-2 px-1">
+                    <h3
+                      className={[
+                        "text-sm font-extrabold",
+                        g.done ? "text-gold" : "text-ink",
+                      ].join(" ")}
+                    >
+                      {g.label}
+                    </h3>
+                    <span className="text-xs font-semibold text-mut">{g.words.length}개</span>
+                  </div>
+                  <WordTable
+                    words={g.words}
+                    progress={progress}
+                    mode={bookReverse ? "ko" : "jp"}
+                    onShowCard={(word, x, y) =>
+                      setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+                    }
+                    onRetire={(id) => update(id, markRetired)}
+                    onUnretire={(id) => update(id, markUnretire)}
+                  />
+                </section>
+              ))}
+            </div>
           </>
         )
       ) : view === "scan" ? (

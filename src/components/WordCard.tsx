@@ -1,6 +1,7 @@
 import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
+import { KanjiInsight } from "./KanjiInsight";
 
 /** 단어 상세 카드. inBook/onAddBook을 주면 '단어장에 넣기' 버튼이 붙는다. */
 export function WordCard({
@@ -36,7 +37,7 @@ export function WordCard({
       className="no-select pointer-events-none fixed z-50"
       style={{ left, top, bottom, width: W }}
     >
-      <div className="rounded-3xl bg-card p-4 shadow-pop ring-1 ring-line">
+      <div className="pointer-events-auto max-h-[72vh] overflow-y-auto overscroll-contain rounded-3xl bg-card p-4 shadow-pop ring-1 ring-line">
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-ink">{pre}{word.kanji}</span>
           {tradWord && (
@@ -93,6 +94,8 @@ export function WordCard({
             ))}
           </ul>
         </div>
+
+        {word.kanji !== word.kana && <KanjiInsight word={word} />}
 
         {onAddBook && (
           <button

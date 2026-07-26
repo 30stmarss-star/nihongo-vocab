@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
-import { JpText } from "./JpText";
+import { ExampleLine } from "./ExampleLine";
+import { KanjiInsight } from "./KanjiInsight";
 
 /**
  * 오늘의 단어 — 카드 한 장씩 집중 학습.
@@ -134,17 +135,12 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
                   </div>
                 )}
                 {examples.slice(0, 2).map((ex, i) => (
-                  <div key={i} className="mt-4 rounded-2xl bg-base p-3 text-left">
-                    <div className="text-sm font-medium leading-relaxed text-ink">
-                      <JpText text={ex.jp} dictionary={dictionary} onShowCard={onShowCard} />
-                    </div>
-                    {ex.kana !== ex.jp && <div className="mt-0.5 text-xs text-mut">{ex.kana}</div>}
-                    <div className="mt-0.5 text-xs text-sub">{ex.ko}</div>
-                  </div>
+                  <ExampleLine key={i} ex={ex} dictionary={dictionary} onShowCard={onShowCard} />
                 ))}
                 {examples.length > 0 && (
                   <div className="mt-2 text-[11px] text-mut">예문 속 단어를 탭하면 단어 카드가 떠요</div>
                 )}
+                {w.kanji !== w.kana && <KanjiInsight word={w} />}
               </div>
             ) : (
               <div className="mt-8 text-sm font-medium text-mut">탭해서 독음·뜻 보기</div>
