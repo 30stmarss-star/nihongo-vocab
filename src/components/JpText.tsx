@@ -126,8 +126,9 @@ export function JpText({
       let hit: { w: Word; len: number } | null = null;
       for (const { w, key } of candidates) {
         if (!text.startsWith(key, i)) continue;
-        // 가나로 시작하는 표기는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다
-        if (!hasKanji(key[0]) && i > 0 && KANA.test(text[i - 1])) continue;
+        // 가나로만 된 표기는 앞 글자가 가나면 단어 중간일 가능성이 커서 건너뛴다.
+        // (한 글자라도 한자가 섞였으면 — お金·ご飯 — 경계가 분명하니 그대로 매칭)
+        if (!hasKanji(key) && i > 0 && KANA.test(text[i - 1])) continue;
         // 한자 한 글자는 熟語(日本語)의 일부를 떼어내지 않도록 이웃이 한자면 건너뛴다
         if (key.length === 1) {
           const prev = i > 0 ? text[i - 1] : "";
