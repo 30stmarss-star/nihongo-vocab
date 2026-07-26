@@ -7,7 +7,7 @@ import {
 } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
-import { isKnown, isRetired, type Progress } from "../lib/srs";
+import { isRetired, type Progress } from "../lib/srs";
 
 /**
  * mode:
@@ -21,9 +21,8 @@ interface Props {
   words: Word[];
   progress: Record<string, Progress | undefined>;
   onShowCard: (word: Word, x: number, y: number) => void;
-  onKnown: (id: string) => void;
-  onUnknown: (id: string) => void;
   onRetire: (id: string) => void;
+  onUnretire: (id: string) => void;
   mode?: Mode;
 }
 
@@ -60,14 +59,12 @@ function WordRow({
   word,
   progress,
   onShowCard,
-  onKnown,
-  onUnknown,
   onRetire,
+  onUnretire,
   mode = "jp",
 }: { word: Word } & Omit<Props, "words">) {
   const [revealed, setRevealed] = useState(false);
   const [flash, setFlash] = useState(false);
-  const [flashKind, setFlashKind] = useState<"known" | "retired">("known");
   const flashTimer = useRef<number | undefined>(undefined);
   // 따닥(더블탭) 체크: 단어를 빠르게 두 번 탭하면 체크 토글 (한 손 조작용).
   // 첫 탭은 300ms 뒤에 카드를 띄우고, 그 안에 두 번째 탭이 오면 카드 대신 체크.
@@ -104,8 +101,7 @@ function WordRow({
   };
 
   const p = progress[word.id];
-  const retired = isRetired(p); // 왕체크(완전 암기)
-  const known = isKnown(p) && !retired; // 일반 체크
+  const retired = isRetired(p); // 완전 암기
   const ko = mode === "ko";
 
   // 후행 결합형(예: ~ながら)이면 일본어 표제어·독음 앞에 ~를 붙인다.
@@ -118,19 +114,13 @@ function WordRow({
   const maskedLeft = ko ? jpKanji : jpKana; // 가려진 첫 칸
   const maskedRight = ko ? jpKana : word.meaning; // 가려진 둘째 칸
 
-  // 3단 토글: 없음 → 체크 → 왕체크(완전 암기) → 없음
+  // 단일 토글: 없음 ↔ 완전 암기(금색). 해제해도 숙련도는 유지된다.
   function toggle() {
     if (retired) {
-      onUnknown(word.id); // 왕체크 → 해제
+      onUnretire(word.id);
       return;
     }
-    if (known) {
-      onRetire(word.id); // 체크 → 왕체크
-      setFlashKind("retired");
-    } else {
-      onKnown(word.id); // 없음 → 체크
-      setFlashKind("known");
-    }
+    onRetire(word.id);
     setFlash(true);
     window.clearTimeout(flashTimer.current);
     flashTimer.current = window.setTimeout(() => setFlash(false), 650);
@@ -141,19 +131,16 @@ function WordRow({
       className={[
         "relative flex min-h-[3.25rem] items-stretch px-3 py-1.5 transition-colors",
         "border-b border-line last:border-0",
-        retired ? "bg-gold-soft/60" : known ? "bg-mint-soft/50" : "",
-        flash ? (flashKind === "retired" ? "bg-gold-soft" : "bg-mint-soft") : "",
+        retired ? "bg-gold-soft/60" : "",
+        flash ? "bg-gold-soft" : "",
       ].join(" ")}
     >
-      {/* 암기 체크: 행 맨 왼쪽. 오른쪽 화면 가장자리를 눌러도 체크가 토글되지 않게
-          아예 반대편으로 옮겼다. 없음→체크→왕체크(금색 채움+발광)→없음 순으로 순환. */}
+      {/* 완전 암기 체크: 행 맨 왼쪽. 누르면 금색(다시 복습에 안 나옴), 한 번 더 누르면 해제. */}
       <div className="no-select relative z-20 flex w-11 shrink-0 items-stretch">
         <button
           type="button"
-          aria-label={
-            retired ? "완전 암기 해제" : known ? "완전 암기로 표시" : "암기 완료"
-          }
-          aria-pressed={known || retired}
+          aria-label={retired ? "완전 암기 해제" : "완전 암기로 표시"}
+          aria-pressed={retired}
           draggable={false}
           onClick={toggle}
           onContextMenu={(e) => e.preventDefault()}
@@ -165,9 +152,7 @@ function WordRow({
               "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
               retired
                 ? "bg-gold text-white shadow-[0_0_10px_2px_rgba(237,162,58,0.45)] ring-2 ring-gold/50"
-                : known
-                  ? "bg-mint text-white shadow-sm shadow-mint/40"
-                  : "border-2 border-line text-transparent group-hover:border-mint/70",
+                : "border-2 border-line text-transparent group-hover:border-gold/70",
             ].join(" ")}
           >
             ✓
@@ -226,10 +211,10 @@ function WordRow({
         <span
           className={[
             "pointer-events-none absolute left-12 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm font-bold",
-            flashKind === "retired" ? "text-gold" : "text-mint",
+            "text-gold",
           ].join(" ")}
         >
-          {flashKind === "retired" ? "⭐ 완전 정복!" : "✓ 외웠어요!"}
+          ⭐ 완전 암기!
         </span>
       )}
     </li>

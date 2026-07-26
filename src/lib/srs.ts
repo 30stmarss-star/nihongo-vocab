@@ -64,6 +64,15 @@ export function markRetired(p: Progress, now: number): Progress {
   };
 }
 
+/** 왕체크 해제: 숙련도를 최고 단계(5)로 되돌린다 — 복습 주기에만 다시 들어간다. */
+export function markUnretire(p: Progress, now: number): Progress {
+  return {
+    mastery: 5,
+    lastSeen: now,
+    seenCount: p.seenCount + 1,
+  };
+}
+
 /** 학습지에 처음 등장한(아직 안 본) 단어를 '도입됨' 상태로 기록 */
 export function introduce(p: Progress | undefined, now: number): Progress {
   if (p && p.seenCount > 0) return p;

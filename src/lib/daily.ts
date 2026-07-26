@@ -37,7 +37,7 @@ export function addDays(key: string, days: number): string {
 // ── 코스 구성 ──
 
 export const NEW_PER_DAY = 20; // 하루 새 단어
-export const REVIEW_CAP = 20; // 하루 복습 상한(만기분 중 오래 밀린 순)
+export const REVIEW_CAP = 10; // 하루 복습 상한(만기분 중 오래 밀린 순) — 하루치 총 30개
 
 export interface Scenario {
   id: string;
@@ -96,12 +96,6 @@ export interface DailyPlan {
   completedDay: string | null; // 시험 통과한 날(KST) — 달성일
 }
 
-function hashStr(s: string): number {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
-
 /** 새 사이클 구성: 새 단어 NEW_PER_DAY + 복습 만기분(오래 밀린 순) REVIEW_CAP */
 export function buildDailyPlan(
   pool: Word[],
@@ -134,7 +128,8 @@ export function buildDailyPlan(
   );
   const news = fresh.slice(0, NEW_PER_DAY);
 
-  const scenario = SCENARIOS[hashStr(day) % SCENARIOS.length];
+  // 상황은 사이클마다 랜덤 — 코스가 끝날 때까지 유지된다.
+  const scenario = SCENARIOS[Math.floor(Math.random() * SCENARIOS.length)];
 
   return {
     day,

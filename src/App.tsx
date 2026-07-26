@@ -7,15 +7,19 @@ import {
   markKnown,
   markRetired,
   markUnknown,
+  markUnretire,
   touch,
   type ProgressMap,
 } from "./lib/srs";
 import {
+  addToWordbook,
   loadCachedSession,
   loadScannedQueue,
   loadSession,
+  loadWordbookLocal,
   persistProgress,
   persistSettings,
+  syncWordbook,
 } from "./lib/store";
 import {
   buildDailyPlan,
@@ -79,6 +83,8 @@ export default function App() {
   // 단어장 방향: false=일본어 보기(뜻 가림), true=뜻 보기(단어 가림)
   const [bookReverse, setBookReverse] = useState(false);
   const [scanned, setScanned] = useState<Set<string>>(new Set());
+  // 단어장: 하루 코스를 마친 단어 + 촬영 단어의 id 집합
+  const [wordbook, setWordbook] = useState<Set<string>>(new Set());
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
 
   // ── 인증 / 초기 로드 ──
@@ -108,6 +114,8 @@ export default function App() {
   async function init(uid: string | null) {
     setActivity(recordAccess(uid));
     void syncActivity(uid).then(setActivity);
+    setWordbook(loadWordbookLocal(uid));
+    void syncWordbook(uid).then(setWordbook);
 
     // 1) 캐시가 있으면 네트워크를 기다리지 않고 즉시 화면을 띄운다.
     const cached = loadCachedSession(uid);
@@ -190,6 +198,8 @@ export default function App() {
     const nextScanned = new Set(scanned);
     for (const w of saved) nextScanned.add(w.id);
     setScanned(nextScanned);
+    // 촬영한 단어는 단어장에도 바로 넣는다
+    setWordbook((prev) => addToWordbook(userId, saved.map((w) => w.id), prev));
     setView("home");
   }
 
@@ -233,6 +243,12 @@ export default function App() {
     const today = dayKey();
     setActivity(recordDone(userId, today, score));
     updatePlan({ testPassed: true, bestScore: score, completedDay: today });
+    // 하루 코스를 마친 단어는 전부 단어장에 들어간다
+    if (plan) {
+      setWordbook((prev) =>
+        addToWordbook(userId, [...plan.newIds, ...plan.reviewIds], prev)
+      );
+    }
   }
 
   // ── 파생 데이터 ──
@@ -247,14 +263,15 @@ export default function App() {
   }, [plan, words]);
 
   const bookWords = useMemo(() => {
-    // 단어장 = 외운(체크한) 단어만. 못 외운 단어는 복습 사이클이 다시 데려온다.
-    const known = bandPool.filter((w) => isKnown(progress[w.id]));
-    // 외움 → 완전 암기(하단) 순. 그룹 안에서는 최근 본 순.
+    // 단어장 = 하루 코스를 마친 단어 + 촬영 단어 + (예전 방식에서) 체크했던 단어.
+    // 레벨(밴드)과 무관하게 전부 보여준다 — 내가 거쳐온 단어 모음이니까.
+    const list = words.filter((w) => wordbook.has(w.id) || isKnown(progress[w.id]));
+    // 완전 암기는 하단으로. 그 외에는 최근 본 순.
     const rank = (w: Word) => (isRetired(progress[w.id]) ? 1 : 0);
-    return known.sort(
+    return list.sort(
       (a, b) => rank(a) - rank(b) || (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
     );
-  }, [bandPool, progress]);
+  }, [words, wordbook, progress]);
 
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
@@ -417,16 +434,17 @@ export default function App() {
       ) : view === "wordbook" ? (
         bookWords.length === 0 ? (
           <div className="rounded-3xl bg-card px-6 py-14 text-center text-sm text-mut shadow-soft">
-            아직 외운 단어가 없어요.
+            아직 단어장이 비어 있어요.
             <br />
-            체크(✓)한 단어들이 여기에 모여요.
+            하루 코스를 마치거나 촬영으로 넣은 단어가 여기에 쌓여요.
           </div>
         ) : (
           <>
             <div className="mb-3 flex items-center gap-2">
               <p className="text-xs leading-relaxed text-mut">
-                외운 단어 {bookWords.length}개. 꾹 누르면 정답,{" "}
-                <b className="text-sub">단어를 빠르게 두 번 탭</b>하면 체크 토글!
+                내 단어 {bookWords.length}개. 꾹 누르면 정답,{" "}
+                <b className="text-sub">단어를 빠르게 두 번 탭</b>하면{" "}
+                <b className="text-gold">완전 암기</b> 체크!
               </p>
               <button
                 onClick={() => setBookReverse((v) => !v)}
@@ -442,9 +460,8 @@ export default function App() {
               onShowCard={(word, x, y) =>
                 setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
               }
-              onKnown={(id) => update(id, markKnown)}
-              onUnknown={(id) => update(id, markUnknown)}
               onRetire={(id) => update(id, markRetired)}
+              onUnretire={(id) => update(id, markUnretire)}
             />
           </>
         )
