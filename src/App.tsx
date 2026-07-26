@@ -24,11 +24,12 @@ import {
 import {
   buildDailyPlan,
   loadPlan,
+  loadRecentScenarios,
   masteryStats,
+  pushRecentScenario,
   recordAccess,
   recordDone,
   savePlan,
-  scenarioOf,
   streakOf,
   syncActivity,
   dayKey,
@@ -153,7 +154,7 @@ export default function App() {
    * 날짜가 넘어갔으면 새로 만든다. (미완료 사이클은 날짜가 지나도 이어서)
    */
   function ensurePlan(uid: string | null, b: Band, list: Word[], prog: ProgressMap): DailyPlan {
-    const existing = loadPlan(uid);
+    const existing = loadPlan(uid, b);
     const today = dayKey();
     const ids = new Set(list.map((w) => w.id));
     const valid =
@@ -317,7 +318,6 @@ export default function App() {
     );
   }
 
-  const scenario = scenarioOf(plan);
   const focusMode = FOCUS_VIEWS.includes(view);
 
   // ── 코스 집중 화면 (하단 네비 없음) ──
@@ -345,7 +345,12 @@ export default function App() {
     return (
       <main className="h-full">
         <Speaking
-          scenario={scenario}
+          scenario={plan.speakScenario ?? null}
+          recentTitles={loadRecentScenarios(userId)}
+          onScenario={(s) => {
+            updatePlan({ speakScenario: s });
+            pushRecentScenario(userId, s.title);
+          }}
           level={BANDS.find((b) => b.id === band)?.label ?? band}
           focusWords={planWords.list.slice(0, Math.min(3, planWords.newCount))}
           dictionary={words}
@@ -420,7 +425,7 @@ export default function App() {
       {view === "home" ? (
         <Home
           plan={plan}
-          scenario={scenario}
+          scenario={plan.speakScenario ?? null}
           activity={activity}
           streak={streak}
           stats={stats}

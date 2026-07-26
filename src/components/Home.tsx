@@ -1,4 +1,4 @@
-import type { ActivityLog, DailyPlan, Scenario } from "../lib/daily";
+import type { ActivityLog, DailyPlan } from "../lib/daily";
 import { dayKey, grassGrid, SPEAK_STEPS } from "../lib/daily";
 
 /**
@@ -15,7 +15,7 @@ interface Stats {
 
 interface Props {
   plan: DailyPlan;
-  scenario: Scenario;
+  scenario: { emoji: string; title: string } | null; // 아직 안 정해졌으면 null(시작하면 공개)
   activity: ActivityLog;
   streak: number;
   stats: Stats;
@@ -91,10 +91,14 @@ export function Home({
             onClick={() => onStart("learn")}
           />
           <StepRow
-            emoji={scenario.emoji}
+            emoji={scenario?.emoji ?? "🎁"}
             gradient="linear-gradient(135deg,#fb9c8b,#f4695b)"
             title="작문 스피킹"
-            subtitle={`${scenario.title} 상황 · ${SPEAK_STEPS}문장`}
+            subtitle={
+              scenario
+                ? `${scenario.title} 상황 · ${SPEAK_STEPS}문장`
+                : `시작하면 오늘의 상황 공개 · ${SPEAK_STEPS}문장`
+            }
             state={
               plan.speakDone
                 ? { kind: "done" }

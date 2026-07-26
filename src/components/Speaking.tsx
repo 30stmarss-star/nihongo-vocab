@@ -1,8 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Word } from "../data/types";
-import type { Scenario, SpeakTurn } from "../lib/daily";
+import type { SpeakTurn } from "../lib/daily";
 import { SPEAK_STEPS } from "../lib/daily";
 import { supabase } from "../lib/supabase";
+
+/** 오늘의 상황 — Claude가 매 사이클 새로 창작한다 */
+export interface SpeakScenario {
+  emoji: string;
+  title: string;
+  desc: string;
+}
 
 /**
  * 작문 스피킹 — 상황 롤플레이. 내 대사와 상대방 대사를 모두 한글 음차로 작문한다.
@@ -11,12 +18,14 @@ import { supabase } from "../lib/supabase";
  */
 
 interface Props {
-  scenario: Scenario;
+  scenario: SpeakScenario | null; // null이면 서버가 새 상황을 창작한다
+  recentTitles: string[]; // 최근에 나온 상황 제목(반복 방지)
   level: string;
   focusWords: Word[]; // 오늘 새 단어 중 몇 개를 대화에 녹인다
   dictionary: Word[]; // 탭해서 카드 볼 수 있는 단어 풀
   initialIntro?: string;
   initialTurns?: SpeakTurn[];
+  onScenario: (s: SpeakScenario) => void; // 창작된 상황 저장(이어하기용)
   onState: (intro: string, turns: SpeakTurn[], answered: number) => void;
   onDone: () => void;
   onSkip: () => void;
@@ -25,7 +34,8 @@ interface Props {
 }
 
 export function Speaking(props: Props) {
-  const { scenario, level, focusWords, onState, onDone, onSkip, onExit } = props;
+  const { level, focusWords, onState, onDone, onSkip, onExit } = props;
+  const [scenario, setScenario] = useState<SpeakScenario | null>(props.scenario);
   const [intro, setIntro] = useState(props.initialIntro ?? "");
   const [turns, setTurns] = useState<SpeakTurn[]>(props.initialTurns ?? []);
   const [input, setInput] = useState("");
@@ -56,7 +66,19 @@ export function Speaking(props: Props) {
     setLoading(true);
     setError("");
     try {
-      const data = await invoke({ mode: "start", scenario: { title: scenario.title, desc: scenario.desc }, level, focusWords: focusPayload });
+      const data = await invoke({
+        mode: "start",
+        scenario: scenario ? { title: scenario.title, desc: scenario.desc } : null,
+        recent: props.recentTitles,
+        level,
+        focusWords: focusPayload,
+      });
+      const s = data.scenario as SpeakScenario | undefined;
+      if (s?.title) {
+        const scen = { emoji: s.emoji || "🎤", title: s.title, desc: s.desc || "" };
+        setScenario(scen);
+        props.onScenario(scen);
+      }
       const nextIntro = String(data.intro ?? "");
       const nextTurns: SpeakTurn[] = [{ role: "me", instruction: String(data.instruction ?? "") }];
       setIntro(nextIntro);
@@ -92,7 +114,7 @@ export function Speaking(props: Props) {
         willBeAnswered < SPEAK_STEPS ? (current.role === "me" ? "partner" : "me") : null;
       const data = await invoke({
         mode: "answer",
-        scenario: { title: scenario.title, desc: scenario.desc },
+        scenario: scenario ? { title: scenario.title, desc: scenario.desc } : null,
         level,
         focusWords: focusPayload,
         history: turns
@@ -146,7 +168,7 @@ export function Speaking(props: Props) {
 
       <div className="mt-2 flex items-center gap-2">
         <span className="rounded-full bg-coral-soft px-3 py-1 text-sm font-bold text-coral">
-          {scenario.emoji} {scenario.title}
+          {scenario ? `${scenario.emoji} ${scenario.title}` : "🎁 오늘의 상황은…"}
         </span>
         <span className="text-xs text-mut">내 대사도, 상대방 대사도 직접 작문!</span>
       </div>

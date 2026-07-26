@@ -37,7 +37,7 @@ export function addDays(key: string, days: number): string {
 // ── 코스 구성 ──
 
 export const NEW_PER_DAY = 20; // 하루 새 단어
-export const REVIEW_CAP = 10; // 하루 복습 상한(만기분 중 오래 밀린 순) — 하루치 총 30개
+export const REVIEW_CAP = 20; // 하루 복습 상한(만기분 중 오래 밀린 순)
 
 export interface Scenario {
   id: string;
@@ -82,11 +82,12 @@ export interface DailyPlan {
   band: Band;
   newIds: string[];
   reviewIds: string[];
-  scenarioId: string;
+  scenarioId: string; // (구버전 호환용 — 지금은 아래 speakScenario를 쓴다)
   // 진행 상태
   learnIndex: number; // 카드 학습 진행 위치(이어하기)
   learnDone: boolean;
   speakStep: number; // 0~SPEAK_STEPS (작문 완료한 소절 수)
+  speakScenario?: { emoji: string; title: string; desc: string }; // Claude가 창작한 오늘의 상황
   speakIntro?: string; // 상황 도입 문구(이어하기용)
   speakTurns?: SpeakTurn[]; // 진행된 대화(이어하기용)
   speakDone: boolean;
@@ -151,15 +152,43 @@ export function scenarioOf(plan: DailyPlan): Scenario {
   return SCENARIOS.find((s) => s.id === plan.scenarioId) ?? SCENARIOS[0];
 }
 
+// ── 최근에 나온 작문 상황 (반복 방지용, 최근 20개 제목 보관) ──
+
+const recentKey = (uid: string | null) => `speak.recent.${uid ?? "local"}`;
+
+export function loadRecentScenarios(uid: string | null): string[] {
+  try {
+    const raw = localStorage.getItem(recentKey(uid));
+    return raw ? (JSON.parse(raw) as string[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function pushRecentScenario(uid: string | null, title: string): void {
+  try {
+    const list = loadRecentScenarios(uid).filter((t) => t !== title);
+    list.push(title);
+    localStorage.setItem(recentKey(uid), JSON.stringify(list.slice(-20)));
+  } catch {
+    /* noop */
+  }
+}
+
 // ── 저장 (플랜: 로컬 / 달성 기록: 로컬 + 클라우드 병합) ──
 
-const planKey = (uid: string | null) => `daily.plan.${uid ?? "local"}`;
+// 플랜은 밴드별로 따로 보관한다 — 난이도를 바꿨다 돌아와도 하던 코스가 그대로 이어진다.
+const planKey = (uid: string | null, band: Band) => `daily.plan.${uid ?? "local"}.${band}`;
+const legacyPlanKey = (uid: string | null) => `daily.plan.${uid ?? "local"}`;
 const actKey = (uid: string | null) => `daily.activity.${uid ?? "local"}`;
 
-export function loadPlan(uid: string | null): DailyPlan | null {
+export function loadPlan(uid: string | null, band: Band): DailyPlan | null {
   try {
-    const raw = localStorage.getItem(planKey(uid));
-    return raw ? (JSON.parse(raw) as DailyPlan) : null;
+    const raw =
+      localStorage.getItem(planKey(uid, band)) ?? localStorage.getItem(legacyPlanKey(uid));
+    if (!raw) return null;
+    const plan = JSON.parse(raw) as DailyPlan;
+    return plan.band === band ? plan : null;
   } catch {
     return null;
   }
@@ -167,7 +196,7 @@ export function loadPlan(uid: string | null): DailyPlan | null {
 
 export function savePlan(uid: string | null, plan: DailyPlan): void {
   try {
-    localStorage.setItem(planKey(uid), JSON.stringify(plan));
+    localStorage.setItem(planKey(uid, plan.band), JSON.stringify(plan));
   } catch {
     /* noop */
   }

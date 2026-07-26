@@ -45,9 +45,15 @@ const SYSTEM = `당신은 한국인 학습자를 위한 일본어 '스피킹 작
 4. **문법 분해**: 문장 속 조사·활용·문형을 한 줄씩 (「표현」 — 설명 · JLPT 급수).
 - 잘한 부분은 짧게 칭찬하고, 고칠 부분만 콕 집어서. 너무 길지 않게.
 
+## 상황(scenario) 창작 규칙 (mode=start에서 상황이 주어지지 않았을 때)
+- 일본 여행·일상에서 실제로 겪을 법한 회화 상황을 하나 창작합니다. (가게, 교통, 숙소, 병원, 관공서, 대화, 부탁, 문제 해결 등 폭넓게)
+- '최근에 나온 상황' 목록과 겹치지 않는 새로운 것으로.
+- title은 2~6글자의 짧은 한국어, emoji는 어울리는 이모지 1개, desc는 대화가 어떻게 흘러갈지 한 문장.
+
 ## 출력 형식 — 반드시 JSON 하나만 출력 (앞뒤 다른 텍스트 금지)
 mode=start:
-{"intro":"(상황을 여는 한 줄, 한국어)","instruction":"(첫 지시, role=me)"}
+{"scenario":{"emoji":"🏪","title":"(짧은 제목)","desc":"(상황 설명 한 문장)"},"intro":"(상황을 여는 한 줄, 한국어)","instruction":"(첫 지시, role=me)"}
+(상황이 주어진 경우에도 scenario 필드에 그대로 담아 출력)
 mode=answer:
 {"understood":"(정식 일본어 복원)","verdict":"great|ok|retry","correctJp":"(모범 답안 일본어)","correctKana":"(모범 답안 히라가나)","correctKo":"(모범 답안 한글 발음)","feedback":"(위 규칙의 마크다운)","nextInstruction":"(다음 지시. nextRole가 null이면 null)"}`;
 
@@ -82,8 +88,9 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => ({}));
     const mode = body?.mode as "start" | "answer";
-    const scenario = body?.scenario as { title: string; desc: string };
-    if (!mode || !scenario?.title) return json({ error: "mode/scenario가 필요합니다" }, 400);
+    const scenario = body?.scenario as { title: string; desc: string } | null;
+    if (!mode) return json({ error: "mode가 필요합니다" }, 400);
+    if (mode === "answer" && !scenario?.title) return json({ error: "scenario가 필요합니다" }, 400);
 
     const level = typeof body?.level === "string" ? body.level : "N5·N4";
     const focus: Array<{ jp: string; kana: string; ko: string }> = Array.isArray(body?.focusWords)
@@ -98,7 +105,13 @@ Deno.serve(async (req) => {
 
     let userMsg: string;
     if (mode === "start") {
-      userMsg = `상황: ${scenario.title} — ${scenario.desc}\n학습자 레벨: ${level}${focusTxt}\n\n대화를 시작합니다. mode=start JSON을 출력하세요. 첫 지시는 role=me(손님/학습자 본인)입니다.`;
+      const recent: string[] = Array.isArray(body?.recent)
+        ? body.recent.filter((t: unknown) => typeof t === "string").slice(-20)
+        : [];
+      const scenarioTxt = scenario?.title
+        ? `상황: ${scenario.title} — ${scenario.desc}`
+        : `상황: 직접 창작하세요. 최근에 나온 상황(겹치지 않게): ${recent.join(", ") || "없음"}`;
+      userMsg = `${scenarioTxt}\n학습자 레벨: ${level}${focusTxt}\n\n대화를 시작합니다. mode=start JSON을 출력하세요(scenario 필드 포함). 첫 지시는 role=me(손님/학습자 본인)입니다.`;
     } else {
       const history: Turn[] = Array.isArray(body?.history) ? body.history : [];
       const role = body?.role === "partner" ? "partner" : "me";
