@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     if (!apiKey) return json({ error: "ANTHROPIC_API_KEY 미설정" }, 500);
 
     const body = await req.json().catch(() => ({}));
-    const mode = body?.mode as "start" | "answer";
+    const mode = body?.mode as "scenario" | "start" | "answer";
     const scenario = body?.scenario as { title: string; desc: string } | null;
     if (!mode) return json({ error: "mode가 필요합니다" }, 400);
     if (mode === "answer" && !scenario?.title) return json({ error: "scenario가 필요합니다" }, 400);
@@ -104,7 +104,13 @@ Deno.serve(async (req) => {
       : "";
 
     let userMsg: string;
-    if (mode === "start") {
+    if (mode === "scenario") {
+      // 새 코스가 시작될 때 상황만 미리 창작한다 (대화는 나중에 start로)
+      const recent: string[] = Array.isArray(body?.recent)
+        ? body.recent.filter((t: unknown) => typeof t === "string").slice(-20)
+        : [];
+      userMsg = `새로운 회화 상황을 하나만 창작하세요. 최근에 나온 상황(겹치지 않게): ${recent.join(", ") || "없음"}\n학습자 레벨: ${level}\n\n다음 형식의 JSON만 출력하세요:\n{"scenario":{"emoji":"(이모지 1개)","title":"(2~6글자 제목)","desc":"(상황 설명 한 문장)"}}`;
+    } else if (mode === "start") {
       const recent: string[] = Array.isArray(body?.recent)
         ? body.recent.filter((t: unknown) => typeof t === "string").slice(-20)
         : [];

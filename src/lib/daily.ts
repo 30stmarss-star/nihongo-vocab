@@ -165,6 +165,28 @@ export function loadRecentScenarios(uid: string | null): string[] {
   }
 }
 
+/** 새 코스용 상황을 미리 창작해온다. 실패하면 null(스피킹 시작 때 다시 시도). */
+export async function generateScenario(
+  recent: string[],
+  level: string
+): Promise<{ emoji: string; title: string; desc: string } | null> {
+  if (!(CLOUD && supabase)) return null;
+  try {
+    const { data, error } = await supabase.functions.invoke("speaking-roleplay", {
+      body: { mode: "scenario", recent, level },
+    });
+    if (error) throw error;
+    if (data?.error) throw new Error(String(data.error));
+    const s = data?.scenario;
+    return s?.title
+      ? { emoji: s.emoji || "🎤", title: String(s.title), desc: String(s.desc ?? "") }
+      : null;
+  } catch (e) {
+    console.warn("[speak] 상황 미리 생성 실패(시작 시 재시도):", e instanceof Error ? e.message : e);
+    return null;
+  }
+}
+
 export function pushRecentScenario(uid: string | null, title: string): void {
   try {
     const list = loadRecentScenarios(uid).filter((t) => t !== title);

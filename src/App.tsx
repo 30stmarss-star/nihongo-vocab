@@ -23,6 +23,7 @@ import {
 } from "./lib/store";
 import {
   buildDailyPlan,
+  generateScenario,
   loadPlan,
   loadRecentScenarios,
   masteryStats,
@@ -276,6 +277,33 @@ export default function App() {
 
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
+
+  // 새 코스가 생기면 오늘의 작문 상황을 미리 창작해 홈에 보여준다.
+  // (실패해도 스피킹을 열 때 다시 시도하므로 조용히 넘어간다)
+  const scenarioReq = useRef<string | null>(null);
+  useEffect(() => {
+    if (!plan || plan.speakScenario || plan.speakDone || plan.speakSkipped) return;
+    if (!(CLOUD && userId)) return;
+    const key = `${plan.band}.${plan.day}.${plan.newIds[0] ?? ""}`;
+    if (scenarioReq.current === key) return;
+    scenarioReq.current = key;
+    const lvl = BANDS.find((b) => b.id === plan.band)?.label ?? plan.band;
+    void generateScenario(loadRecentScenarios(userId), lvl).then((s) => {
+      if (!s) {
+        scenarioReq.current = null;
+        return;
+      }
+      pushRecentScenario(userId, s.title);
+      setPlan((prev) => {
+        if (!prev || prev.speakScenario || prev.day !== plan.day || prev.band !== plan.band)
+          return prev;
+        const next = { ...prev, speakScenario: s };
+        savePlan(userId, next);
+        return next;
+      });
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [plan, userId]);
 
   function go(v: View) {
     setView(v);
