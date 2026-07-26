@@ -96,7 +96,7 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
   }
 
   return (
-    <div className="rounded-2xl border border-white/10 bg-neutral-950/60 p-4">
+    <div className="rounded-2xl bg-card shadow-soft p-4">
       <input
         ref={fileRef}
         type="file"
@@ -108,12 +108,12 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
       />
 
       {notice && (
-        <div className="mb-3 rounded-xl border border-emerald-400/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
+        <div className="mb-3 rounded-xl border border-pri/30 bg-pri-soft px-3 py-2 text-sm text-pri-deep">
           {notice}
         </div>
       )}
       {err && (
-        <div className="mb-3 rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-sm text-amber-300">
+        <div className="mb-3 rounded-xl border border-gold/30 bg-gold-soft px-3 py-2 text-sm text-gold">
           {err}
         </div>
       )}
@@ -121,18 +121,18 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
       {/* ── 촬영/선택 ── */}
       {stage === "pick" && (
         <div className="flex flex-col items-center gap-4 py-8 text-center">
-          <div className="text-sm text-neutral-400">
-            교재·노트·손글씨를 찍으면 <b className="text-neutral-200">일본어를 인식</b>해서
+          <div className="text-sm text-sub">
+            교재·노트·손글씨를 찍으면 <b className="text-ink">일본어를 인식</b>해서
             <br />
             단어·독음·뜻·레벨을 자동으로 정리해요.
           </div>
           <button
             onClick={() => fileRef.current?.click()}
-            className="rounded-2xl bg-emerald-500 px-6 py-3 text-base font-semibold text-white transition hover:bg-emerald-400"
+            className="rounded-2xl bg-pri px-6 py-3 text-base font-semibold text-white transition hover:bg-pri-deep"
           >
             📷 사진 찍기 / 고르기
           </button>
-          <div className="text-xs text-neutral-500">
+          <div className="text-xs text-mut">
             밝고 반듯하게, 한 번에 최대 6장. 손글씨는 또박또박할수록 정확해요.
           </div>
         </div>
@@ -148,11 +148,11 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
               ))}
             </div>
           )}
-          <div className="flex items-center gap-2 text-sm text-neutral-400">
+          <div className="flex items-center gap-2 text-sm text-sub">
             <span className="inline-flex gap-1">
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.15s]" />
-              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut [animation-delay:-0.3s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut [animation-delay:-0.15s]" />
+              <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut" />
             </span>
             글자를 읽고 단어를 뽑는 중…
           </div>
@@ -163,11 +163,11 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
       {(stage === "review" || stage === "saving") && (
         <div>
           <div className="mb-3 flex items-center gap-2">
-            <p className="text-xs text-neutral-500">
-              인식 결과를 확인하고 <b className="text-neutral-300">틀린 건 고치거나 빼고</b> 저장하세요.
+            <p className="text-xs text-mut">
+              인식 결과를 확인하고 <b className="text-sub">틀린 건 고치거나 빼고</b> 저장하세요.
               저장하면 학습지 맨 앞에 떠요.
             </p>
-            <span className="ml-auto shrink-0 text-xs text-neutral-400">
+            <span className="ml-auto shrink-0 text-xs text-sub">
               {rows.filter((r) => r.include).length}/{rows.length} 선택
             </span>
           </div>
@@ -179,8 +179,8 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
                 className={[
                   "rounded-xl border p-3 transition",
                   r.include
-                    ? "border-white/10 bg-neutral-900"
-                    : "border-white/5 bg-neutral-900/40 opacity-50",
+                    ? "border-line bg-card"
+                    : "border-line bg-card/40 opacity-50",
                 ].join(" ")}
               >
                 <div className="flex items-start gap-2">
@@ -191,8 +191,8 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
                     className={[
                       "mt-0.5 grid h-6 w-6 shrink-0 place-items-center rounded-md text-xs transition",
                       r.include
-                        ? "bg-emerald-500 text-white"
-                        : "border border-white/25 text-transparent",
+                        ? "bg-pri text-white"
+                        : "border border-pri/40 text-transparent",
                     ].join(" ")}
                   >
                     ✓
@@ -203,26 +203,26 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
                         value={r.cand.kanji}
                         onChange={(e) => edit(i, { kanji: e.target.value })}
                         placeholder="표제어"
-                        className="w-[42%] rounded-lg border border-white/10 bg-neutral-950 px-2 py-1.5 text-base text-white outline-none focus:border-emerald-400/60"
+                        className="w-[42%] rounded-lg border border-line bg-card px-2 py-1.5 text-base text-ink outline-none focus:border-pri"
                       />
                       <input
                         value={r.cand.kana}
                         onChange={(e) => edit(i, { kana: e.target.value })}
                         placeholder="독음(히라가나)"
-                        className="flex-1 rounded-lg border border-white/10 bg-neutral-950 px-2 py-1.5 text-sm text-neutral-200 outline-none focus:border-emerald-400/60"
+                        className="flex-1 rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-pri"
                       />
                     </div>
                     <input
                       value={r.cand.meaning}
                       onChange={(e) => edit(i, { meaning: e.target.value })}
                       placeholder="한국어 뜻"
-                      className="w-full rounded-lg border border-white/10 bg-neutral-950 px-2 py-1.5 text-sm text-emerald-300 outline-none focus:border-emerald-400/60"
+                      className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-pri-deep outline-none focus:border-pri"
                     />
                     <div className="flex gap-1.5">
                       <select
                         value={r.cand.level}
                         onChange={(e) => edit(i, { level: e.target.value as Level })}
-                        className="rounded-lg border border-white/10 bg-neutral-950 px-2 py-1.5 text-xs text-neutral-200"
+                        className="rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-ink"
                       >
                         {LEVELS.map((lv) => (
                           <option key={lv} value={lv}>
@@ -233,7 +233,7 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
                       <select
                         value={r.cand.pos}
                         onChange={(e) => edit(i, { pos: e.target.value as WordType["kind"] })}
-                        className="rounded-lg border border-white/10 bg-neutral-950 px-2 py-1.5 text-xs text-neutral-200"
+                        className="rounded-lg border border-line bg-card px-2 py-1.5 text-xs text-ink"
                       >
                         {POS_OPTIONS.map((p) => (
                           <option key={p.value} value={p.value}>
@@ -252,14 +252,14 @@ export function ScanCapture({ onSaved }: { onSaved: (words: Word[]) => void }) {
             <button
               onClick={reset}
               disabled={stage === "saving"}
-              className="rounded-xl border border-white/10 bg-neutral-900 px-4 py-2 text-sm text-neutral-300 transition hover:border-white/25 disabled:opacity-40"
+              className="rounded-xl bg-card shadow-soft px-4 py-2 text-sm text-sub transition hover:border-pri/40 disabled:opacity-40"
             >
               다시 찍기
             </button>
             <button
               onClick={() => void save()}
               disabled={stage === "saving" || !rows.some((r) => r.include)}
-              className="flex-1 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400 disabled:opacity-40"
+              className="flex-1 rounded-xl bg-pri px-4 py-2 text-sm font-semibold text-white transition hover:bg-pri-deep disabled:opacity-40"
             >
               {stage === "saving"
                 ? "저장 중…"

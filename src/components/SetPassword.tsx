@@ -33,10 +33,10 @@ export function SetPassword({ inline = false }: { inline?: boolean }) {
 
   if (inline) {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/60 p-4">
-        <h2 className="text-base font-bold text-white">비밀번호 설정</h2>
-        <p className="mt-1 mb-3 text-xs text-neutral-400">
-          비밀번호를 정하면 다음부터 <b className="text-neutral-200">메일 없이</b> 이메일+비밀번호로
+      <div className="rounded-2xl bg-card shadow-soft p-4">
+        <h2 className="text-base font-bold text-ink">비밀번호 설정</h2>
+        <p className="mt-1 mb-3 text-xs text-sub">
+          비밀번호를 정하면 다음부터 <b className="text-ink">메일 없이</b> 이메일+비밀번호로
           로그인할 수 있어요.
         </p>
         <input
@@ -45,17 +45,17 @@ export function SetPassword({ inline = false }: { inline?: boolean }) {
           value={pw}
           onChange={(e) => setPw(e.target.value)}
           placeholder="새 비밀번호 (6자 이상)"
-          className="w-full rounded-lg border border-white/10 bg-neutral-950 px-2.5 py-2 text-sm text-neutral-100 outline-none focus:border-emerald-400/60"
+          className="w-full rounded-lg border border-line bg-card px-2.5 py-2 text-sm text-ink outline-none focus:border-pri"
         />
         <button
           onClick={save}
           disabled={busy}
-          className="mt-2 w-full rounded-lg bg-emerald-500 px-3 py-2 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:opacity-50"
+          className="mt-2 w-full rounded-lg bg-pri px-3 py-2 text-sm font-medium text-white transition hover:bg-pri-deep disabled:opacity-50"
         >
           {busy ? "저장 중..." : "저장"}
         </button>
         {msg && (
-          <p className={`mt-2 text-xs ${ok ? "text-emerald-300" : "text-amber-300"}`}>{msg}</p>
+          <p className={`mt-2 text-xs ${ok ? "text-pri-deep" : "text-gold"}`}>{msg}</p>
         )}
       </div>
     );
@@ -65,16 +65,16 @@ export function SetPassword({ inline = false }: { inline?: boolean }) {
     <div className="relative">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="text-xs text-neutral-500 hover:text-neutral-300"
+        className="text-xs text-mut hover:text-sub"
         title="비밀번호 설정"
       >
         🔑 비밀번호
       </button>
 
       {open && (
-        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-white/10 bg-neutral-900 p-3 shadow-xl shadow-black/50">
-          <p className="mb-2 text-xs text-neutral-400">
-            비밀번호를 정하면 다음부터 <b className="text-neutral-200">메일 없이</b> 로그인할 수
+        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl bg-card shadow-soft p-3 shadow-pop">
+          <p className="mb-2 text-xs text-sub">
+            비밀번호를 정하면 다음부터 <b className="text-ink">메일 없이</b> 로그인할 수
             있어요.
           </p>
           <input
@@ -83,17 +83,17 @@ export function SetPassword({ inline = false }: { inline?: boolean }) {
             value={pw}
             onChange={(e) => setPw(e.target.value)}
             placeholder="새 비밀번호 (6자 이상)"
-            className="w-full rounded-lg border border-white/10 bg-neutral-950 px-2.5 py-1.5 text-sm text-neutral-100 outline-none focus:border-emerald-400/60"
+            className="w-full rounded-lg border border-line bg-card px-2.5 py-1.5 text-sm text-ink outline-none focus:border-pri"
           />
           <button
             onClick={save}
             disabled={busy}
-            className="mt-2 w-full rounded-lg bg-emerald-500 px-3 py-1.5 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:opacity-50"
+            className="mt-2 w-full rounded-lg bg-pri px-3 py-1.5 text-sm font-medium text-white transition hover:bg-pri-deep disabled:opacity-50"
           >
             {busy ? "저장 중..." : "저장"}
           </button>
           {msg && (
-            <p className={`mt-2 text-xs ${ok ? "text-emerald-300" : "text-amber-300"}`}>{msg}</p>
+            <p className={`mt-2 text-xs ${ok ? "text-pri-deep" : "text-gold"}`}>{msg}</p>
           )}
         </div>
       )}

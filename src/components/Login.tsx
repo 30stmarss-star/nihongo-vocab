@@ -47,8 +47,8 @@ export function Login() {
   return (
     <main className="mx-auto flex min-h-full max-w-sm flex-col justify-center gap-6 px-6">
       <div>
-        <h1 className="text-2xl font-bold text-white">일본어 단어 암기</h1>
-        <p className="mt-2 text-sm text-neutral-400">
+        <h1 className="text-2xl font-bold text-ink">일본어 단어 암기</h1>
+        <p className="mt-2 text-sm text-sub">
           {mode === "password"
             ? "이메일과 비밀번호로 로그인하세요."
             : "이메일로 일회용 로그인 링크를 보내드려요."}
@@ -56,9 +56,9 @@ export function Login() {
       </div>
 
       {sent ? (
-        <div className="rounded-2xl border border-emerald-400/30 bg-emerald-500/10 px-5 py-6 text-sm text-emerald-200">
+        <div className="rounded-2xl border border-pri/30 bg-pri-soft px-5 py-6 text-sm text-pri-deep">
           <b>{email}</b> 로 로그인 링크를 보냈어요. 메일함의 링크를 누르면 바로 로그인됩니다.
-          <p className="mt-3 text-xs text-emerald-300/80">
+          <p className="mt-3 text-xs text-mint">
             로그인 후 화면 위 <b>🔑 비밀번호</b>에서 비밀번호를 정해두면, 다음부턴 메일 없이
             바로 로그인할 수 있어요.
           </p>
@@ -67,7 +67,7 @@ export function Login() {
               setSent(false);
               setMode("password");
             }}
-            className="mt-3 block text-xs text-emerald-300/80 hover:text-emerald-200"
+            className="mt-3 block text-xs text-mint hover:text-pri-deep"
           >
             ← 비밀번호 로그인으로 돌아가기
           </button>
@@ -82,7 +82,7 @@ export function Login() {
             placeholder="이메일"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
-            className="rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-emerald-400/60"
+            className="rounded-xl bg-card shadow-soft px-4 py-3 text-ink outline-none focus:border-pri"
           />
 
           {mode === "password" && (
@@ -93,14 +93,14 @@ export function Login() {
               placeholder="비밀번호"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              className="rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-white outline-none focus:border-emerald-400/60"
+              className="rounded-xl bg-card shadow-soft px-4 py-3 text-ink outline-none focus:border-pri"
             />
           )}
 
           <button
             type="submit"
             disabled={busy}
-            className="rounded-xl bg-emerald-500 px-4 py-3 font-medium text-white transition hover:bg-emerald-400 disabled:opacity-50"
+            className="rounded-xl bg-pri px-4 py-3 font-medium text-white transition hover:bg-pri-deep disabled:opacity-50"
           >
             {busy
               ? "처리 중..."
@@ -109,7 +109,7 @@ export function Login() {
                 : "로그인 링크 받기"}
           </button>
 
-          {err && <p className="text-sm text-amber-300">{err}</p>}
+          {err && <p className="text-sm text-gold">{err}</p>}
 
           <button
             type="button"
@@ -117,7 +117,7 @@ export function Login() {
               setErr(null);
               setMode((m) => (m === "password" ? "link" : "password"));
             }}
-            className="mt-1 text-center text-xs text-neutral-500 hover:text-neutral-300"
+            className="mt-1 text-center text-xs text-mut hover:text-sub"
           >
             {mode === "password"
               ? "비밀번호가 없거나 잊으셨나요? 메일 링크로 로그인"
@@ -125,10 +125,10 @@ export function Login() {
           </button>
 
           {mode === "password" && (
-            <p className="mt-1 text-center text-[11px] leading-relaxed text-neutral-600">
+            <p className="mt-1 text-center text-[11px] leading-relaxed text-mut">
               처음이신가요? 위{" "}
-              <b className="text-neutral-400">메일 링크로 로그인</b>으로 메일 인증을 먼저 하세요.
-              로그인되면 화면 위 <b className="text-neutral-400">🔑 비밀번호</b>에서 비밀번호를
+              <b className="text-sub">메일 링크로 로그인</b>으로 메일 인증을 먼저 하세요.
+              로그인되면 화면 위 <b className="text-sub">🔑 비밀번호</b>에서 비밀번호를
               설정할 수 있어요.
             </p>
           )}

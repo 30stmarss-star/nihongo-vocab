@@ -47,11 +47,11 @@ export function ConfusableCards({ userId }: { userId: string | null }) {
   return (
     <div className="space-y-3">
       {/* 공부할 묶음 / 외운 묶음 전환 */}
-      <div className="flex gap-1 rounded-xl bg-neutral-900 p-1 text-sm">
+      <div className="flex gap-1 rounded-xl bg-card p-1 text-sm">
         <button
           onClick={() => setShowMemorized(false)}
           className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-            !showMemorized ? "bg-neutral-700 text-white" : "text-neutral-400 hover:text-neutral-200"
+            !showMemorized ? "bg-pri text-white" : "text-sub hover:text-ink"
           }`}
         >
           공부할 묶음 {studyGroups.length}
@@ -59,22 +59,22 @@ export function ConfusableCards({ userId }: { userId: string | null }) {
         <button
           onClick={() => setShowMemorized(true)}
           className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-            showMemorized ? "bg-neutral-700 text-white" : "text-neutral-400 hover:text-neutral-200"
+            showMemorized ? "bg-pri text-white" : "text-sub hover:text-ink"
           }`}
         >
           외운 묶음 {memorizedGroups.length}
         </button>
       </div>
 
-      <p className="text-xs text-neutral-500">
-        헷갈리기 쉬운 한자를 묶었어요. <b className="text-neutral-300">구별 포인트</b>를 보고,
-        그룹을 <b className="text-neutral-300">꾹 누르면</b> 뜻·읽기가 한꺼번에 드러나요.
-        다 외운 묶음은 <span className="text-emerald-300">✓</span> 로 체크하면 따로 모여요.{" "}
-        <span className="text-neutral-600">(히라가나=훈독, 카타카나=음독)</span>
+      <p className="text-xs text-mut">
+        헷갈리기 쉬운 한자를 묶었어요. <b className="text-sub">구별 포인트</b>를 보고,
+        그룹을 <b className="text-sub">꾹 누르면</b> 뜻·읽기가 한꺼번에 드러나요.
+        다 외운 묶음은 <span className="text-pri-deep">✓</span> 로 체크하면 따로 모여요.{" "}
+        <span className="text-mut">(히라가나=훈독, 카타카나=음독)</span>
       </p>
 
       {list.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-neutral-950/60 px-6 py-12 text-center text-sm text-neutral-500">
+        <div className="rounded-2xl bg-card shadow-soft px-6 py-12 text-center text-sm text-mut">
           {showMemorized
             ? "아직 외운 묶음이 없어요. 묶음을 ✓ 로 체크하면 여기에 모여요."
             : "모든 묶음을 외웠어요! 🎉"}
@@ -107,13 +107,13 @@ function GroupCard({
   return (
     <section
       className={[
-        "overflow-hidden rounded-2xl border bg-neutral-950/60",
-        memorized ? "border-emerald-500/30" : "border-white/10",
+        "overflow-hidden rounded-2xl border bg-card",
+        memorized ? "border-mint/40" : "border-line",
       ].join(" ")}
     >
       {/* 헤더: 라벨 + 외움 체크 */}
-      <div className="flex items-center gap-2 border-b border-white/10 px-4 py-2.5">
-        <span className="min-w-0 flex-1 text-sm font-semibold text-white">{g.group_label}</span>
+      <div className="flex items-center gap-2 border-b border-line px-4 py-2.5">
+        <span className="min-w-0 flex-1 text-sm font-semibold text-ink">{g.group_label}</span>
         <button
           type="button"
           aria-label={memorized ? "외움 해제" : "외움 완료"}
@@ -123,8 +123,8 @@ function GroupCard({
           className={[
             "no-select grid h-8 w-8 shrink-0 place-items-center rounded-full text-sm transition active:scale-90",
             memorized
-              ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-              : "border border-white/25 text-transparent hover:border-emerald-400/70",
+              ? "bg-pri text-white shadow-sm shadow-mint/40"
+              : "border border-pri/40 text-transparent hover:border-pri/70",
           ].join(" ")}
         >
           ✓
@@ -143,7 +143,7 @@ function GroupCard({
         onPointerUp={() => setRevealed(false)}
         onPointerCancel={() => setRevealed(false)}
       >
-        <ul className="divide-y divide-white/5">
+        <ul className="divide-y divide-line">
           {g.kanji.map((k) => (
             <KanjiEntry key={k.kanji} k={k} revealed={revealed} />
           ))}
@@ -158,33 +158,33 @@ function KanjiEntry({ k, revealed }: { k: ConfusableKanji; revealed: boolean }) 
     <li className="flex items-stretch gap-3 px-4 py-3">
       {/* 한자 + 한국어 훈음(예: 흙 토): 항상 보임 */}
       <div className="flex w-[60px] shrink-0 flex-col items-center justify-center gap-1">
-        <span className="text-4xl leading-none text-white">{k.kanji}</span>
+        <span className="text-4xl leading-none text-ink">{k.kanji}</span>
         {KANJI_KO[k.kanji] && (
-          <span className="text-[10px] leading-none text-neutral-400">{KANJI_KO[k.kanji]}</span>
+          <span className="text-[10px] leading-none text-sub">{KANJI_KO[k.kanji]}</span>
         )}
       </div>
 
       <div className="min-w-0 flex-1">
         {/* 구별 포인트: 항상 */}
-        <div className="text-xs leading-snug text-amber-300/90">{k.distinguish_ko}</div>
+        <div className="text-xs leading-snug text-gold">{k.distinguish_ko}</div>
 
         {/* 읽기 · 뜻: 가림 */}
         <Mask revealed={revealed} className="mt-1.5">
-          <span className="text-base text-neutral-100">{k.reading_key}</span>
-          <span className="mx-1.5 text-neutral-600">·</span>
-          <span className="text-base text-emerald-300">{k.meaning_ko}</span>
+          <span className="text-base text-ink">{k.reading_key}</span>
+          <span className="mx-1.5 text-mut">·</span>
+          <span className="text-base text-pri-deep">{k.meaning_ko}</span>
         </Mask>
 
         {/* 예문: 단어는 항상, 후리가나·뜻은 가림 */}
         <div className="mt-1.5 text-sm leading-snug">
-          <span className="text-xs text-neutral-500">예)</span>{" "}
-          <span className="text-neutral-200">{k.example.word}</span>{" "}
+          <span className="text-xs text-mut">예)</span>{" "}
+          <span className="text-ink">{k.example.word}</span>{" "}
           <Mask revealed={revealed} inline>
-            <span className="text-neutral-400">{k.example.reading}</span>
+            <span className="text-sub">{k.example.reading}</span>
           </Mask>{" "}
-          <span className="text-neutral-600">·</span>{" "}
+          <span className="text-mut">·</span>{" "}
           <Mask revealed={revealed} inline>
-            <span className="text-neutral-400">{k.example.meaning_ko}</span>
+            <span className="text-sub">{k.example.meaning_ko}</span>
           </Mask>
         </div>
       </div>
@@ -224,7 +224,7 @@ function Mask({
       <span
         aria-hidden
         className={[
-          "absolute inset-0 rounded-md bg-white/10 transition-opacity duration-200",
+          "absolute inset-0 rounded-md bg-base transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",
         ].join(" ")}
       />

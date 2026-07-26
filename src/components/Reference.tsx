@@ -7,7 +7,7 @@ export function Reference() {
 
   return (
     <div className="space-y-2">
-      <p className="px-1 text-xs text-neutral-500">
+      <p className="px-1 text-xs text-mut">
         플래시카드보다 표로 외우는 게 나은 것들이에요. 주황색은 특히 불규칙해서 통째로
         외워야 하는 부분.
       </p>
@@ -16,22 +16,22 @@ export function Reference() {
         return (
           <div
             key={t.id}
-            className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60"
+            className="overflow-hidden rounded-2xl bg-card shadow-soft"
           >
             <button
               onClick={() => setOpen(isOpen ? null : t.id)}
-              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-white/[0.03]"
+              className="flex w-full items-center gap-3 px-4 py-3 text-left transition hover:bg-pri-soft/40"
             >
               <span className="text-lg">{t.icon}</span>
               <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-white">{t.title}</span>
+                <span className="block text-sm font-semibold text-ink">{t.title}</span>
                 {t.sub && (
-                  <span className="block truncate text-xs text-neutral-500">{t.sub}</span>
+                  <span className="block truncate text-xs text-mut">{t.sub}</span>
                 )}
               </span>
               <span
                 className={[
-                  "text-neutral-500 transition-transform",
+                  "text-mut transition-transform",
                   isOpen ? "rotate-90" : "",
                 ].join(" ")}
               >
@@ -40,9 +40,9 @@ export function Reference() {
             </button>
 
             {isOpen && (
-              <div className="space-y-4 border-t border-white/10 px-4 pb-4 pt-3">
+              <div className="space-y-4 border-t border-line px-4 pb-4 pt-3">
                 {t.tips && t.tips.length > 0 && (
-                  <ul className="space-y-1 rounded-xl bg-amber-400/[0.07] px-3 py-2 text-xs text-amber-200/90">
+                  <ul className="space-y-1 rounded-xl bg-gold/[0.07] px-3 py-2 text-xs text-gold/90">
                     {t.tips.map((tip, i) => (
                       <li key={i}>· {tip}</li>
                     ))}
@@ -65,12 +65,12 @@ function TableView({ table }: { table: RefTable }) {
   return (
     <div>
       {table.caption && (
-        <div className="mb-1.5 text-xs font-medium text-neutral-400">{table.caption}</div>
+        <div className="mb-1.5 text-xs font-medium text-sub">{table.caption}</div>
       )}
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-sm">
           <thead>
-            <tr className="border-b border-white/10 text-left text-xs text-neutral-500">
+            <tr className="border-b border-line text-left text-xs text-mut">
               {table.cols.map((c, i) => (
                 <th key={i} className="py-1.5 pr-3 font-medium">
                   {c}
@@ -83,8 +83,8 @@ function TableView({ table }: { table: RefTable }) {
               <tr
                 key={ri}
                 className={[
-                  "border-b border-white/5 last:border-0",
-                  hi.has(ri) ? "text-amber-300" : "text-neutral-200",
+                  "border-b border-line last:border-0",
+                  hi.has(ri) ? "text-gold" : "text-ink",
                 ].join(" ")}
               >
                 {r.map((cell, ci) => (
@@ -92,7 +92,7 @@ function TableView({ table }: { table: RefTable }) {
                     key={ci}
                     className={[
                       "py-1.5 pr-3 align-top [overflow-wrap:anywhere]",
-                      ci === 0 ? "text-neutral-400" : "",
+                      ci === 0 ? "text-sub" : "",
                       hi.has(ri) && ci !== 0 ? "font-semibold" : "",
                     ].join(" ")}
                   >

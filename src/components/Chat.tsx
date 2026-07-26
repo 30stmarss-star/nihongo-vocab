@@ -20,13 +20,13 @@ function renderInline(text: string, keyBase: string) {
     const key = `${keyBase}-${i}`;
     if (/^\*\*[^*]+\*\*$/.test(p))
       return (
-        <strong key={key} className="font-semibold text-white">
+        <strong key={key} className="font-semibold text-ink">
           {p.slice(2, -2)}
         </strong>
       );
     if (/^「[^」]+」$/.test(p))
       return (
-        <span key={key} className="font-semibold text-emerald-300">
+        <span key={key} className="font-semibold text-pri-deep">
           {p}
         </span>
       );
@@ -45,7 +45,7 @@ function Markdown({ text }: { text: string }) {
           const content = line.replace(/^\s*[-・*]\s+/, "");
           return (
             <div key={i} className="flex gap-2 pl-0.5">
-              <span className="select-none text-emerald-400">·</span>
+              <span className="select-none text-mint">·</span>
               <span>{renderInline(content, String(i))}</span>
             </div>
           );
@@ -99,11 +99,11 @@ export function Chat() {
   }
 
   return (
-    <div className="flex h-[70vh] flex-col overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
+    <div className="flex h-[70vh] flex-col overflow-hidden rounded-2xl bg-card shadow-soft">
       {/* 메시지 영역 */}
       <div ref={scrollRef} className="flex-1 space-y-3 overflow-y-auto px-3 py-4 text-sm sm:px-4">
         {messages.length === 0 && (
-          <div className="rounded-2xl bg-neutral-900/70 px-4 py-3 text-neutral-300">
+          <div className="rounded-2xl bg-card/70 px-4 py-3 text-sub">
             <Markdown text={GREETING} />
           </div>
         )}
@@ -111,13 +111,13 @@ export function Chat() {
         {messages.map((m, i) =>
           m.role === "user" ? (
             <div key={i} className="flex justify-end">
-              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-emerald-500/20 px-3.5 py-2 text-emerald-50">
+              <div className="max-w-[85%] whitespace-pre-wrap rounded-2xl rounded-br-sm bg-pri-soft px-3.5 py-2 text-pri-deep">
                 {m.content}
               </div>
             </div>
           ) : (
             <div key={i} className="flex justify-start">
-              <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-neutral-900 px-3.5 py-2.5 text-neutral-200">
+              <div className="max-w-[92%] rounded-2xl rounded-bl-sm bg-card px-3.5 py-2.5 text-ink">
                 <Markdown text={m.content} />
               </div>
             </div>
@@ -126,25 +126,25 @@ export function Chat() {
 
         {busy && (
           <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-sm bg-neutral-900 px-4 py-3 text-neutral-500">
+            <div className="rounded-2xl rounded-bl-sm bg-card px-4 py-3 text-mut">
               <span className="inline-flex gap-1">
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.3s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500 [animation-delay:-0.15s]" />
-                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-neutral-500" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut [animation-delay:-0.3s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut [animation-delay:-0.15s]" />
+                <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-mut" />
               </span>
             </div>
           </div>
         )}
 
         {err && (
-          <div className="rounded-xl border border-amber-400/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-300">
+          <div className="rounded-xl border border-gold/30 bg-gold-soft px-3 py-2 text-xs text-gold">
             {err}
           </div>
         )}
       </div>
 
       {/* 입력 바 */}
-      <div className="border-t border-white/10 bg-neutral-900/60 p-2.5">
+      <div className="border-t border-line bg-card p-2.5">
         <div className="flex items-end gap-2">
           <textarea
             value={input}
@@ -152,12 +152,12 @@ export function Chat() {
             onKeyDown={onKey}
             rows={1}
             placeholder="한국어 또는 일본어 발음으로 입력… (Enter 전송, Shift+Enter 줄바꿈)"
-            className="max-h-32 flex-1 resize-none rounded-xl border border-white/10 bg-neutral-950 px-3 py-2 text-sm text-neutral-100 outline-none focus:border-emerald-400/60"
+            className="max-h-32 flex-1 resize-none rounded-xl border border-line bg-card px-3 py-2 text-sm text-ink outline-none focus:border-pri"
           />
           <button
             onClick={() => void send()}
             disabled={busy || !input.trim()}
-            className="shrink-0 rounded-xl bg-emerald-500 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-400 disabled:opacity-40"
+            className="shrink-0 rounded-xl bg-pri px-4 py-2 text-sm font-medium text-white transition hover:bg-pri-deep disabled:opacity-40"
           >
             전송
           </button>

@@ -1,4 +1,5 @@
 import {
+  useEffect,
   useRef,
   useState,
   type MouseEvent as ReactMouseEvent,
@@ -29,9 +30,9 @@ interface Props {
 export function WordTable(props: Props) {
   const ko = props.mode === "ko";
   return (
-    <div className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
+    <div className="overflow-hidden rounded-3xl bg-card shadow-soft">
       {/* 헤더 */}
-      <div className="flex items-center border-b border-white/10 px-3 py-3 text-xs font-medium tracking-wide text-neutral-400">
+      <div className="flex items-center border-b border-line px-3 py-3 text-xs font-bold tracking-wide text-mut">
         <div className="w-11 shrink-0 text-center">암기</div>
         <div className="w-[34%] shrink-0 pl-1">{ko ? "뜻" : "단어"}</div>
         <div className="grid flex-1 grid-cols-2 gap-2">
@@ -68,6 +69,11 @@ function WordRow({
   const [flash, setFlash] = useState(false);
   const [flashKind, setFlashKind] = useState<"known" | "retired">("known");
   const flashTimer = useRef<number | undefined>(undefined);
+  // 따닥(더블탭) 체크: 단어를 빠르게 두 번 탭하면 체크 토글 (한 손 조작용).
+  // 첫 탭은 300ms 뒤에 카드를 띄우고, 그 안에 두 번째 탭이 오면 카드 대신 체크.
+  // (카드를 즉시 띄우면 전체 화면 '카드 닫기' 오버레이가 두 번째 탭을 삼킨다)
+  const tapTimer = useRef<number | undefined>(undefined);
+  useEffect(() => () => window.clearTimeout(tapTimer.current), []);
 
   // 정답 공개(press-hold): 지금 잘 작동하는 '가림막'과 동일한 방식.
   // 아래 <li> 전체를 덮는 투명 오버레이 하나에만 이 핸들러를 달아, 가림막 모양은 그대로 두고
@@ -134,9 +140,9 @@ function WordRow({
     <li
       className={[
         "relative flex min-h-[3.25rem] items-stretch px-3 py-1.5 transition-colors",
-        "border-b border-white/5 last:border-0",
-        retired ? "bg-amber-400/[0.06]" : known ? "bg-emerald-500/[0.07]" : "",
-        flash ? (flashKind === "retired" ? "bg-amber-400/15" : "bg-emerald-500/15") : "",
+        "border-b border-line last:border-0",
+        retired ? "bg-gold-soft/60" : known ? "bg-mint-soft/50" : "",
+        flash ? (flashKind === "retired" ? "bg-gold-soft" : "bg-mint-soft") : "",
       ].join(" ")}
     >
       {/* 암기 체크: 행 맨 왼쪽. 오른쪽 화면 가장자리를 눌러도 체크가 토글되지 않게
@@ -158,10 +164,10 @@ function WordRow({
             className={[
               "grid h-7 w-7 place-items-center rounded-full text-sm font-bold transition",
               retired
-                ? "bg-amber-400 text-amber-950 shadow-[0_0_10px_2px_rgba(251,191,36,0.55)] ring-2 ring-amber-300/70"
+                ? "bg-gold text-white shadow-[0_0_10px_2px_rgba(237,162,58,0.45)] ring-2 ring-gold/50"
                 : known
-                  ? "bg-emerald-500 text-white shadow-sm shadow-emerald-500/40"
-                  : "border border-white/25 text-transparent group-hover:border-emerald-400/70",
+                  ? "bg-mint text-white shadow-sm shadow-mint/40"
+                  : "border-2 border-line text-transparent group-hover:border-mint/70",
             ].join(" ")}
           >
             ✓
@@ -177,11 +183,24 @@ function WordRow({
         <button
           type="button"
           className={[
-            "no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left leading-snug text-white",
+            "no-select pointer-events-auto relative z-20 flex min-w-0 max-w-full cursor-pointer items-center py-2.5 text-left font-semibold leading-snug text-ink",
             ko ? "text-sm sm:text-base" : "text-base sm:text-lg",
           ].join(" ")}
           onContextMenu={(e) => e.preventDefault()}
-          onClick={(e) => onShowCard(word, e.clientX, e.clientY)}
+          onClick={(e) => {
+            const { clientX, clientY } = e;
+            if (tapTimer.current !== undefined) {
+              // 따닥: 두 번째 탭 → 카드 대신 체크 토글
+              window.clearTimeout(tapTimer.current);
+              tapTimer.current = undefined;
+              toggle();
+            } else {
+              tapTimer.current = window.setTimeout(() => {
+                tapTimer.current = undefined;
+                onShowCard(word, clientX, clientY);
+              }, 300);
+            }
+          }}
         >
           <span className="line-clamp-2 [overflow-wrap:anywhere]">
             {promptText}
@@ -193,8 +212,8 @@ function WordRow({
           화면 오른쪽 가장자리 어디를 눌러도 체크와 무관하다. */}
       <div className="relative flex flex-1 items-center py-2.5">
         <div className="grid flex-1 grid-cols-2 gap-2 sm:gap-4">
-          <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-white" : "text-neutral-200"} />
-          <MaskedCell text={maskedRight} revealed={revealed} className="text-neutral-300" />
+          <MaskedCell text={maskedLeft} revealed={revealed} className={ko ? "text-ink font-semibold" : "text-sub"} />
+          <MaskedCell text={maskedRight} revealed={revealed} className="text-sub" />
         </div>
       </div>
 
@@ -206,8 +225,8 @@ function WordRow({
       {flash && (
         <span
           className={[
-            "pointer-events-none absolute left-12 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm",
-            flashKind === "retired" ? "text-amber-300" : "text-emerald-400",
+            "pointer-events-none absolute left-12 top-1 z-30 animate-[floatUp_0.65s_ease-out] text-sm font-bold",
+            flashKind === "retired" ? "text-gold" : "text-mint",
           ].join(" ")}
         >
           {flashKind === "retired" ? "⭐ 완전 정복!" : "✓ 외웠어요!"}
@@ -242,7 +261,7 @@ function MaskedCell({
         aria-hidden
         className={[
           "absolute inset-y-0 left-0 right-0 rounded-md",
-          "bg-white/15",
+          "bg-line/80",
           "transition-opacity duration-200",
           revealed ? "opacity-0" : "opacity-100",
         ].join(" ")}

@@ -24,27 +24,27 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
       className="no-select pointer-events-none fixed z-50"
       style={{ left, top, bottom, width: W }}
     >
-      <div className="rounded-2xl border border-white/10 bg-neutral-900 p-4 shadow-2xl shadow-black/60 ring-1 ring-black/40">
+      <div className="rounded-3xl bg-card p-4 shadow-pop ring-1 ring-line">
         <div className="flex items-baseline gap-2">
-          <span className="text-2xl font-semibold text-white">{pre}{word.kanji}</span>
+          <span className="text-2xl font-bold text-ink">{pre}{word.kanji}</span>
           {tradWord && (
-            <span className="text-base text-amber-300/90" title="한국식 정자">
+            <span className="text-base text-gold" title="한국식 정자">
               ({tradWord})
             </span>
           )}
           {word.kanji !== word.kana && (
-            <span className="text-sm text-neutral-400">{pre}{word.kana}</span>
+            <span className="text-sm font-medium text-pri">{pre}{word.kana}</span>
           )}
-          <span className="ml-auto rounded-full bg-white/10 px-2 py-0.5 text-xs text-neutral-300">
+          <span className="ml-auto rounded-full bg-base px-2 py-0.5 text-xs font-semibold text-sub">
             {word.level} · {typeLabel(word.type)}
           </span>
         </div>
 
-        <div className="mt-1 text-base text-emerald-300">{word.meaning}</div>
+        <div className="mt-1 text-base font-bold text-pri-deep">{word.meaning}</div>
 
         {hanja.length > 0 && (
           <div className="mt-3">
-            <div className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">
+            <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-mut">
               한자 훈독
             </div>
             <div className="flex flex-wrap gap-1.5">
@@ -53,11 +53,11 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
                 return (
                   <span
                     key={i}
-                    className="rounded-md bg-white/5 px-2 py-1 text-sm text-neutral-200"
+                    className="rounded-md bg-base px-2 py-1 text-sm text-sub"
                   >
-                    <b className="mr-1 text-white">
+                    <b className="mr-1 text-ink">
                       {h.char}
-                      {trad && <span className="text-amber-300/90">({trad})</span>}
+                      {trad && <span className="text-gold">({trad})</span>}
                     </b>
                     {h.reading}
                   </span>
@@ -68,15 +68,15 @@ export function WordCard({ word, x, y }: { word: Word; x: number; y: number }) {
         )}
 
         <div className="mt-3">
-          <div className="mb-1 text-[11px] uppercase tracking-wide text-neutral-500">
+          <div className="mb-1 text-[11px] font-bold uppercase tracking-wide text-mut">
             예문
           </div>
           <ul className="space-y-2">
             {examples.map((ex, i) => (
               <li key={i} className="text-sm">
-                <div className="text-neutral-100">{ex.jp}</div>
-                <div className="text-xs text-neutral-500">{ex.kana}</div>
-                <div className="text-xs text-neutral-400">{ex.ko}</div>
+                <div className="font-medium text-ink">{ex.jp}</div>
+                <div className="text-xs text-mut">{ex.kana}</div>
+                <div className="text-xs text-sub">{ex.ko}</div>
               </li>
             ))}
           </ul>

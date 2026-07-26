@@ -1,7 +1,35 @@
 @import "tailwindcss";
 
+/*
+ * 라이트 테마 디자인 토큰 — 라벤더 그레이 바탕 + 흰 카드 + 페리윙클/코럴.
+ * (레퍼런스: 파스텔 언어학습 앱. 부드러운 그림자, 큰 라운드, 그라데이션 스텝 카드)
+ */
+@theme {
+  --color-base: #edf0f8; /* 페이지 배경(라벤더 그레이) */
+  --color-card: #ffffff; /* 카드 표면 */
+  --color-ink: #2e3358; /* 본문 텍스트(짙은 남보라) */
+  --color-sub: #666d93; /* 보조 텍스트 */
+  --color-mut: #9aa1c2; /* 흐린 텍스트/라벨 */
+  --color-line: #e5e8f4; /* 경계선 */
+  --color-pri: #6b7ff2; /* 주 색상(페리윙클 블루) */
+  --color-pri-deep: #5163e0; /* 눌림/강조 */
+  --color-pri-soft: #eaedfe; /* 주 색상 연한 배경 */
+  --color-coral: #f4695b; /* 보조 강조(코럴) */
+  --color-coral-soft: #fdeae6;
+  --color-mint: #23b287; /* 성공/암기 체크 */
+  --color-mint-soft: #e0f6ee;
+  --color-gold: #eda23a; /* 왕체크(완전 암기) */
+  --color-gold-soft: #fdf1dc;
+
+  --shadow-soft: 0 10px 30px rgba(84, 101, 192, 0.1);
+  --shadow-pop: 0 16px 40px rgba(64, 78, 160, 0.16);
+
+  --font-sans: "Pretendard Variable", Pretendard, "Noto Sans JP", "Hiragino Sans",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -12,10 +40,10 @@ body,
 
 body {
   margin: 0;
-  background: #0f0f10;
-  color: #f3f4f6;
-  font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Noto Sans KR",
-    "Noto Sans JP", "Segoe UI", sans-serif;
+  background: #edf0f8;
+  color: #2e3358;
+  font-family: "Pretendard Variable", Pretendard, "Noto Sans JP", "Hiragino Sans",
+    -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   -webkit-tap-highlight-color: transparent;
   /* 리스트 맨 아래에서 고무줄 스크롤/당겨서새로고침이 꾹누르기 터치를 가로채는 것 방지 */
   overscroll-behavior: none;
@@ -42,5 +70,40 @@ html {
   100% {
     opacity: 0;
     transform: translateY(-14px);
+  }
+}
+
+/* 카드 뒤집기/등장 등 코스 화면용 잔잔한 모션 */
+@keyframes cardIn {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes popIn {
+  0% {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  60% {
+    transform: scale(1.06);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
   }
 }

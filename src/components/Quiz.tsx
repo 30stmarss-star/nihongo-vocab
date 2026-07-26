@@ -81,7 +81,7 @@ function weightedPick(words: Word[], count: number, progress: ProgressMap): Word
  * 오답 보기 생성. 헷갈리게: **같은 품사 → 같은 레벨**을 우선해 뜻만 보고 소거하지 못하게.
  * (같은 품사 뜻이 부족하면 같은 레벨 → 아무거나로 보충)
  */
-function meaningChoices(word: Word, band: Word[]): { choices: string[]; answer: number } {
+export function meaningChoices(word: Word, band: Word[]): { choices: string[]; answer: number } {
   const usable = band.filter((w) => w.id !== word.id && w.meaning !== word.meaning);
   const samePos = usable.filter((w) => w.type.kind === word.type.kind);
   const rank = [
@@ -230,21 +230,21 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
   // ── 인트로 ──
   if (phase === "intro") {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/60 p-6 text-center">
-        <div className="text-lg font-bold text-white">단어 시험 📝</div>
-        <p className="mx-auto mt-2 max-w-sm text-sm text-neutral-400">
-          학습한 단어에서 <b className="text-neutral-200">{total}문항</b>이 나와요.
+      <div className="rounded-2xl bg-card shadow-soft p-6 text-center">
+        <div className="text-lg font-bold text-ink">단어 시험 📝</div>
+        <p className="mx-auto mt-2 max-w-sm text-sm text-sub">
+          학습한 단어에서 <b className="text-ink">{total}문항</b>이 나와요.
           단어→뜻(4지선다), 뜻→단어(독음 입력), 문장 빈칸이 섞여 나옵니다. 다 풀면
-          채점하고, <b className="text-neutral-200">틀린 단어는 복습에 다시</b> 떠요.
+          채점하고, <b className="text-ink">틀린 단어는 복습에 다시</b> 떠요.
         </p>
         {!enough ? (
-          <p className="mt-4 text-sm text-amber-300">
+          <p className="mt-4 text-sm text-gold">
             학습한 단어가 부족해요(최소 6개). 학습지에서 좀 더 풀어 보세요.
           </p>
         ) : (
           <button
             onClick={build}
-            className="mt-5 rounded-xl bg-emerald-500 px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-400"
+            className="mt-5 rounded-xl bg-pri px-6 py-2.5 text-sm font-semibold text-white transition hover:bg-pri-deep"
           >
             시험 시작
           </button>
@@ -256,9 +256,9 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
   // ── 로딩 ──
   if (phase === "loading") {
     return (
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/60 px-6 py-16 text-center text-sm text-neutral-400">
+      <div className="rounded-2xl bg-card shadow-soft px-6 py-16 text-center text-sm text-sub">
         시험지 만드는 중…
-        <div className="mt-2 text-xs text-neutral-600">문장 문제를 생성하고 있어요</div>
+        <div className="mt-2 text-xs text-mut">문장 문제를 생성하고 있어요</div>
       </div>
     );
   }
@@ -269,20 +269,20 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
     const pct = Math.round((correctCount / qs.length) * 100);
     return (
       <div className="space-y-4">
-        <div className="rounded-2xl border border-white/10 bg-neutral-950/60 p-6 text-center">
-          <div className="text-sm text-neutral-400">점수</div>
-          <div className="mt-1 text-3xl font-bold text-white">
-            {correctCount} <span className="text-neutral-500">/ {qs.length}</span>
+        <div className="rounded-2xl bg-card shadow-soft p-6 text-center">
+          <div className="text-sm text-sub">점수</div>
+          <div className="mt-1 text-3xl font-bold text-ink">
+            {correctCount} <span className="text-mut">/ {qs.length}</span>
           </div>
           <div
             className={[
               "mt-1 text-sm font-semibold",
-              pct >= 80 ? "text-emerald-400" : pct >= 50 ? "text-amber-300" : "text-rose-400",
+              pct >= 80 ? "text-mint" : pct >= 50 ? "text-gold" : "text-coral",
             ].join(" ")}
           >
             {pct}점
           </div>
-          <p className="mt-3 text-xs text-neutral-500">
+          <p className="mt-3 text-xs text-mut">
             틀린 단어는 복습 목록으로 돌아갔어요. 맞힌 단어는 숙련도가 올랐어요.
           </p>
           <div className="mt-4 flex justify-center gap-2">
@@ -291,13 +291,13 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
                 applied.current = false;
                 setPhase("intro");
               }}
-              className="rounded-xl bg-emerald-500/20 px-4 py-2 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/30"
+              className="rounded-xl bg-pri-soft px-4 py-2 text-sm font-medium text-pri-deep transition hover:bg-pri-soft"
             >
               다시 시험
             </button>
             <button
               onClick={onClose}
-              className="rounded-xl border border-white/10 px-4 py-2 text-sm text-neutral-300 transition hover:border-white/25"
+              className="rounded-xl border border-line px-4 py-2 text-sm text-sub transition hover:border-pri/40"
             >
               닫기
             </button>
@@ -305,7 +305,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
         </div>
 
         {/* 문항별 리뷰 */}
-        <ul className="overflow-hidden rounded-2xl border border-white/10 bg-neutral-950/60">
+        <ul className="overflow-hidden rounded-2xl bg-card shadow-soft">
           {qs.map((q, i) => {
             const ok = results[i].correct;
             const yourRaw = answers[i];
@@ -320,25 +320,25 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
             const correct =
               q.kind === "type" ? q.word.kana : q.choices[q.answer];
             return (
-              <li key={i} className="border-b border-white/5 px-4 py-3 last:border-0">
+              <li key={i} className="border-b border-line px-4 py-3 last:border-0">
                 <div className="flex items-start gap-2">
-                  <span className={ok ? "text-emerald-400" : "text-rose-400"}>
+                  <span className={ok ? "text-mint" : "text-coral"}>
                     {ok ? "○" : "✕"}
                   </span>
                   <div className="min-w-0 flex-1">
-                    <div className="text-sm text-white">
+                    <div className="text-sm text-ink">
                       {boundPrefix(q.word) + q.word.kanji}
-                      <span className="ml-2 text-xs text-neutral-500">
+                      <span className="ml-2 text-xs text-mut">
                         {q.word.kana} · {q.word.meaning}
                       </span>
                     </div>
                     {q.kind === "cloze" && (
-                      <div className="mt-1 text-xs text-neutral-400">{q.sentence}</div>
+                      <div className="mt-1 text-xs text-sub">{q.sentence}</div>
                     )}
                     {!ok && (
                       <div className="mt-1 text-xs">
-                        <span className="text-rose-300/80">내 답: {your}</span>
-                        <span className="ml-3 text-emerald-300/80">정답: {correct}</span>
+                        <span className="text-coral">내 답: {your}</span>
+                        <span className="ml-3 text-mint">정답: {correct}</span>
                       </div>
                     )}
                   </div>
@@ -371,30 +371,30 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
     <div className="space-y-4">
       {/* 진행바 */}
       <div>
-        <div className="mb-1 flex items-center justify-between text-xs text-neutral-500">
+        <div className="mb-1 flex items-center justify-between text-xs text-mut">
           <span>
             {cur + 1} / {qs.length}
           </span>
-          <button onClick={onClose} className="hover:text-neutral-300">
+          <button onClick={onClose} className="hover:text-sub">
             그만두기
           </button>
         </div>
-        <div className="h-1.5 overflow-hidden rounded-full bg-white/10">
+        <div className="h-1.5 overflow-hidden rounded-full bg-base">
           <div
-            className="h-full bg-emerald-500 transition-all"
+            className="h-full bg-pri transition-all"
             style={{ width: `${((cur + 1) / qs.length) * 100}%` }}
           />
         </div>
       </div>
 
-      {note && <div className="rounded-lg bg-amber-400/10 px-3 py-2 text-xs text-amber-300">{note}</div>}
+      {note && <div className="rounded-lg bg-gold-soft px-3 py-2 text-xs text-gold">{note}</div>}
 
-      <div className="rounded-2xl border border-white/10 bg-neutral-950/60 p-5">
+      <div className="rounded-2xl bg-card shadow-soft p-5">
         {/* 문제 */}
         {q.kind === "mc" && (
           <>
-            <div className="text-xs text-neutral-500">뜻을 고르세요</div>
-            <div className="mt-1 text-2xl font-semibold text-white">{q.prompt}</div>
+            <div className="text-xs text-mut">뜻을 고르세요</div>
+            <div className="mt-1 text-2xl font-semibold text-ink">{q.prompt}</div>
             <div className="mt-4 grid gap-2">
               {q.choices.map((c, i) => (
                 <button
@@ -403,8 +403,8 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
                   className={[
                     "rounded-xl border px-4 py-3 text-left text-sm transition",
                     sel === i
-                      ? "border-emerald-400 bg-emerald-500/15 text-white"
-                      : "border-white/10 bg-neutral-900 text-neutral-200 hover:border-white/25",
+                      ? "border-pri bg-pri-soft text-ink"
+                      : "border-line bg-card text-ink hover:border-pri/40",
                   ].join(" ")}
                 >
                   {c}
@@ -416,9 +416,9 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
 
         {q.kind === "cloze" && (
           <>
-            <div className="text-xs text-neutral-500">빈칸에 알맞은 단어</div>
-            <div className="mt-1 text-lg leading-relaxed text-white">{q.sentence}</div>
-            {q.ko && <div className="mt-1 text-xs text-neutral-500">{q.ko.replace(q.word.meaning, "____")}</div>}
+            <div className="text-xs text-mut">빈칸에 알맞은 단어</div>
+            <div className="mt-1 text-lg leading-relaxed text-ink">{q.sentence}</div>
+            {q.ko && <div className="mt-1 text-xs text-mut">{q.ko.replace(q.word.meaning, "____")}</div>}
             <div className="mt-4 grid grid-cols-2 gap-2">
               {q.choices.map((c, i) => (
                 <button
@@ -427,8 +427,8 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
                   className={[
                     "rounded-xl border px-3 py-3 text-center text-base transition",
                     sel === i
-                      ? "border-emerald-400 bg-emerald-500/15 text-white"
-                      : "border-white/10 bg-neutral-900 text-neutral-200 hover:border-white/25",
+                      ? "border-pri bg-pri-soft text-ink"
+                      : "border-line bg-card text-ink hover:border-pri/40",
                   ].join(" ")}
                 >
                   {c}
@@ -440,10 +440,10 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
 
         {q.kind === "type" && (
           <>
-            <div className="text-xs text-neutral-500">
-              뜻을 보고 독음 입력 <span className="text-neutral-600">(히라가나·한국어 독음 모두 인정)</span>
+            <div className="text-xs text-mut">
+              뜻을 보고 독음 입력 <span className="text-mut">(히라가나·한국어 독음 모두 인정)</span>
             </div>
-            <div className="mt-1 text-2xl font-semibold text-white">{q.word.meaning}</div>
+            <div className="mt-1 text-2xl font-semibold text-ink">{q.word.meaning}</div>
             <input
               value={typeof sel === "string" ? sel : ""}
               onChange={(e) => choose(e.target.value)}
@@ -454,7 +454,7 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
               autoComplete="off"
               autoCapitalize="off"
               placeholder="예: にる 또는 니루"
-              className="mt-4 w-full rounded-xl border border-white/10 bg-neutral-900 px-4 py-3 text-lg text-white outline-none focus:border-emerald-400/60"
+              className="mt-4 w-full rounded-xl bg-card shadow-soft px-4 py-3 text-lg text-ink outline-none focus:border-pri"
             />
           </>
         )}
@@ -467,8 +467,8 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
           className={[
             "rounded-xl px-6 py-2.5 text-sm font-semibold transition",
             answered
-              ? "bg-emerald-500 text-white hover:bg-emerald-400"
-              : "cursor-not-allowed bg-neutral-800 text-neutral-500",
+              ? "bg-pri text-white hover:bg-pri-deep"
+              : "cursor-not-allowed bg-base text-mut",
           ].join(" ")}
         >
           {last ? "채점하기" : "다음"}

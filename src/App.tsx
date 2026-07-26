@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { BANDS, type Band, type Word } from "./data/types";
 import {
-  buildWorksheet,
   defaultProgress,
   isKnown,
   isRetired,
@@ -12,13 +11,26 @@ import {
   type ProgressMap,
 } from "./lib/srs";
 import {
-  DEFAULT_SIZE,
   loadCachedSession,
   loadScannedQueue,
   loadSession,
   persistProgress,
   persistSettings,
 } from "./lib/store";
+import {
+  buildDailyPlan,
+  loadPlan,
+  masteryStats,
+  recordAccess,
+  recordDone,
+  savePlan,
+  scenarioOf,
+  streakOf,
+  syncActivity,
+  dayKey,
+  type ActivityLog,
+  type DailyPlan,
+} from "./lib/daily";
 import { CLOUD, supabase } from "./lib/supabase";
 import { WordTable } from "./components/WordTable";
 import { WordCard } from "./components/WordCard";
@@ -29,13 +41,29 @@ import { ScanCapture } from "./components/ScanCapture";
 import { SetPassword } from "./components/SetPassword";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
+import { Home } from "./components/Home";
+import { DailyLearn } from "./components/DailyLearn";
+import { DailyTest } from "./components/DailyTest";
+import { Speaking } from "./components/Speaking";
 import { BUILD_ID, forceUpdate } from "./lib/version";
 
+type View =
+  | "home"
+  | "learn"
+  | "speak"
+  | "test"
+  | "wordbook"
+  | "scan"
+  | "kanji"
+  | "tutor"
+  | "account"
+  | "quiz"
+  | "reference";
 
-type View = "study" | "learned" | "kanji" | "tutor" | "scan" | "account" | "quiz" | "reference";
-
-const HINT_KEY = "hint.longpress.v1";
 type Phase = "loading" | "login" | "ready";
+
+/** 코스 진행 화면(전체 화면 집중 모드) — 하단 네비를 숨긴다 */
+const FOCUS_VIEWS: View[] = ["learn", "speak", "test"];
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -45,30 +73,15 @@ export default function App() {
   const [words, setWords] = useState<Word[]>([]);
   const [progress, setProgress] = useState<ProgressMap>({});
   const [band, setBand] = useState<Band | null>(null);
-  const size = DEFAULT_SIZE; // 학습지 크기 30개 고정
-  const [view, setView] = useState<View>("study");
-  // 보조 기능(닮은꼴·튜터·계정) 더보기 메뉴 열림 상태
+  const [view, setView] = useState<View>("home");
   const [menuOpen, setMenuOpen] = useState(false);
-  // '새 버전 받기' 진행 중 표시
   const [updating, setUpdating] = useState(false);
-  // 학습지 사용법 안내: 첫 접속 때 1회만 팝업
-  const [showHint, setShowHint] = useState(() => {
-    try {
-      return !localStorage.getItem(HINT_KEY);
-    } catch {
-      return false;
-    }
-  });
-  // 외운 단어 뷰: false=일본어 보기(뜻 가림), true=뜻 보기(단어·독음 가림, 거꾸로 복습)
-  const [learnedReverse, setLearnedReverse] = useState(false);
-  // 학습지 뷰 방향: true=한국어→일본어(뜻 보고 단어 떠올리기, 메인 루트), false=일본어→뜻
-  const [studyReverse, setStudyReverse] = useState(true);
-  const [worksheet, setWorksheet] = useState<Word[]>([]);
-  // 촬영으로 넣은 '최우선' 단어 id 집합 (아직 안 외운 것 → 학습지 맨 앞에 고정)
+  const [plan, setPlan] = useState<DailyPlan | null>(null);
+  const [activity, setActivity] = useState<ActivityLog>({ access: {}, done: {} });
+  // 단어장 방향: false=일본어 보기(뜻 가림), true=뜻 보기(단어 가림)
+  const [bookReverse, setBookReverse] = useState(false);
   const [scanned, setScanned] = useState<Set<string>>(new Set());
-  const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(
-    null
-  );
+  const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
 
   // ── 인증 / 초기 로드 ──
   useEffect(() => {
@@ -95,19 +108,17 @@ export default function App() {
   }, []);
 
   async function init(uid: string | null) {
-    // 1) 캐시가 있으면 네트워크를 기다리지 않고 즉시 화면을 띄운다(체감 로딩 대폭 단축).
+    setActivity(recordAccess(uid));
+    void syncActivity(uid).then(setActivity);
+
+    // 1) 캐시가 있으면 네트워크를 기다리지 않고 즉시 화면을 띄운다.
     const cached = loadCachedSession(uid);
-    let shownSheet: Word[] | null = null;
-    let shownBand: Band | null = null;
     if (cached && cached.words.length) {
       setWords(cached.words);
       setProgress(cached.progress);
       if (cached.band) {
         setBand(cached.band);
-        const { sheet } = makeSheet(cached.band, size, cached.progress, cached.words);
-        setWorksheet(sheet);
-        shownSheet = sheet;
-        shownBand = cached.band;
+        setPlan(ensurePlan(uid, cached.band, cached.words, cached.progress));
       }
       setPhase("ready");
     } else {
@@ -115,38 +126,13 @@ export default function App() {
     }
 
     // 2) 서버에서 최신 데이터를 받아 백그라운드로 반영한다.
-    const [s, scannedSet] = await Promise.all([
-      loadSession(uid),
-      loadScannedQueue(uid),
-    ]);
+    const [s, scannedSet] = await Promise.all([loadSession(uid), loadScannedQueue(uid)]);
     setWords(s.words);
     setScanned(scannedSet);
-
-    if (s.band && shownSheet && s.band === shownBand && scannedSet.size === 0) {
-      // 이미 캐시로 보여준 학습지는 유지한다(buildWorksheet가 무작위라 다시 만들면 바뀜).
-      // 진행상황만 갱신하고, 보여준 학습지의 '도입' 기록은 보존한다.
+    setProgress(s.progress);
+    if (s.band) {
       setBand(s.band);
-      const now = Date.now();
-      const next = { ...s.progress };
-      const changed: string[] = [];
-      for (const w of shownSheet) {
-        const t = touch(next[w.id], now);
-        if (t !== next[w.id]) {
-          next[w.id] = t;
-          changed.push(w.id);
-        }
-      }
-      setProgress(next);
-      if (changed.length) persistProgress(uid, next, changed);
-    } else if (s.band) {
-      // 캐시가 없었거나(첫 방문) 밴드가 달라졌거나 스캔 우선 단어가 있으면 새로 만든다.
-      setBand(s.band);
-      const { sheet, next, changed } = makeSheet(s.band, size, s.progress, s.words, scannedSet);
-      setProgress(next);
-      setWorksheet(sheet);
-      if (changed.length) persistProgress(uid, next, changed);
-    } else {
-      setProgress(s.progress);
+      setPlan(ensurePlan(uid, s.band, s.words, s.progress));
     }
     setPhase("ready");
   }
@@ -156,73 +142,57 @@ export default function App() {
     return list.filter((w) => levels.includes(w.level));
   }
 
-  /** 학습지 생성 + 새로 등장한 단어를 '도입됨'으로 기록 */
-  function makeSheet(
-    b: Band,
-    n: number,
-    prog: ProgressMap,
-    list: Word[],
-    pri: Set<string> = scanned
-  ) {
-    const now = Date.now();
-    // 밴드 단어 + 스캔 우선 단어(밴드 밖 레벨이어도 포함)의 합집합을 풀로 사용한다.
-    const bandPool = poolFor(b, list);
-    const inPool = new Set(bandPool.map((w) => w.id));
-    const extra = list.filter((w) => pri.has(w.id) && !inPool.has(w.id));
-    const pool = extra.length ? [...bandPool, ...extra] : bandPool;
-    const sheet = buildWorksheet(pool, prog, n, now, Math.random, pri);
-    const next = { ...prog };
-    const changed: string[] = [];
-    for (const w of sheet) {
-      const t = touch(next[w.id], now);
-      if (t !== next[w.id]) {
-        next[w.id] = t;
-        changed.push(w.id);
-      }
-    }
-    return { sheet, next, changed };
+  /**
+   * 오늘의 플랜 확보: 없거나, 밴드가 바뀌었거나, 지난 사이클을 통과한 뒤
+   * 날짜가 넘어갔으면 새로 만든다. (미완료 사이클은 날짜가 지나도 이어서)
+   */
+  function ensurePlan(uid: string | null, b: Band, list: Word[], prog: ProgressMap): DailyPlan {
+    const existing = loadPlan(uid);
+    const today = dayKey();
+    const ids = new Set(list.map((w) => w.id));
+    const valid =
+      existing &&
+      existing.band === b &&
+      existing.newIds.concat(existing.reviewIds).some((id) => ids.has(id)) &&
+      !(existing.testPassed && existing.day !== today);
+    if (valid) return existing!;
+    const fresh = buildDailyPlan(poolFor(b, list), prog, b);
+    savePlan(uid, fresh);
+    return fresh;
   }
 
-  function regenerate(n: number = size) {
+  function updatePlan(patch: Partial<DailyPlan>) {
+    setPlan((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev, ...patch };
+      savePlan(userId, next);
+      return next;
+    });
+  }
+
+  function newCycle() {
     if (!band) return;
-    const { sheet, next, changed } = makeSheet(band, n, progress, words);
-    setWorksheet(sheet);
-    if (changed.length) {
-      setProgress(next);
-      persistProgress(userId, next, changed);
-    }
+    const fresh = buildDailyPlan(poolFor(band), progress, band);
+    savePlan(userId, fresh);
+    setPlan(fresh);
   }
 
   function chooseBand(b: Band) {
     setBand(b);
-    persistSettings(userId, b, size);
-    const { sheet, next, changed } = makeSheet(b, size, progress, words);
-    setWorksheet(sheet);
-    if (changed.length) {
-      setProgress(next);
-      persistProgress(userId, next, changed);
-    }
+    persistSettings(userId, b, 30);
+    setPlan(ensurePlan(userId, b, words, progress));
   }
 
-  /** 촬영 저장 완료: 단어 풀에 병합 + 우선순위 등록 + 학습지 맨 앞에 반영 후 학습지로 이동 */
+  /** 촬영 저장 완료: 단어 풀에 병합 (다음 사이클의 새 단어 후보로 들어간다) */
   function onScanSaved(saved: Word[]) {
     if (!saved.length) return;
     const byId = new Map(words.map((w) => [w.id, w]));
     for (const w of saved) byId.set(w.id, w);
-    const merged = [...byId.values()];
+    setWords([...byId.values()]);
     const nextScanned = new Set(scanned);
     for (const w of saved) nextScanned.add(w.id);
-    setWords(merged);
     setScanned(nextScanned);
-    if (band) {
-      const { sheet, next, changed } = makeSheet(band, size, progress, merged, nextScanned);
-      setWorksheet(sheet);
-      if (changed.length) {
-        setProgress(next);
-        persistProgress(userId, next, changed);
-      }
-    }
-    setView("study");
+    setView("home");
   }
 
   function update(id: string, fn: typeof markKnown) {
@@ -234,7 +204,18 @@ export default function App() {
     });
   }
 
-  /** 시험 결과 일괄 반영: 맞힌 단어는 숙련도↑, 틀린 단어는 복습으로(숙련도 리셋). */
+  /** 카드 학습에서 단어가 화면에 나옴 → 도입 기록 */
+  function onSeen(id: string) {
+    setProgress((prev) => {
+      const t = touch(prev[id], Date.now());
+      if (t === prev[id]) return prev;
+      const next = { ...prev, [id]: t };
+      persistProgress(userId, next, [id]);
+      return next;
+    });
+  }
+
+  /** 시험 결과 일괄 반영: 맞힌 단어는 숙련도↑, 틀린 단어는 복습으로. */
   function applyQuizResults(results: QuizResult[]) {
     setProgress((prev) => {
       const now = Date.now();
@@ -250,78 +231,58 @@ export default function App() {
     });
   }
 
-  const learnedWords = useMemo(() => {
-    if (!band) return [];
-    const list = poolFor(band).filter((w) => isKnown(progress[w.id]));
-    // 왕체크(완전 암기)는 하단에 따로 모은다 — 위쪽엔 어중간하게 외운 것만 보이게.
-    // (그 외 순서는 원래대로. 안정 정렬이라 같은 그룹 내 순서는 유지된다.)
-    return list.sort(
-      (a, b) =>
-        (isRetired(progress[a.id]) ? 1 : 0) - (isRetired(progress[b.id]) ? 1 : 0)
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [band, progress, words]);
-
-  // 외운 단어 뷰의 실제 표시 목록. 왕체크·해제 모두 '세션 스냅샷' 방식으로 동일하게 동작:
-  //  - 뷰에 '처음 들어올 때'만 목록을 다시 계산(왕체크는 하단 정렬, 해제된 건 빠짐).
-  //  - 뷰 안에서 체크를 바꿔도 재정렬·삭제하지 않고 제자리 유지 → 금색 전환도, 해제(빈 원)도
-  //    그 자리에서 보여 구분되고, 실제 정리는 탭을 다시 열 때 일어난다.
-  const [learnedDisplay, setLearnedDisplay] = useState<Word[]>([]);
-  const prevViewRef = useRef<View>(view);
-
-  useEffect(() => {
-    const wasLearned = prevViewRef.current === "learned";
-    prevViewRef.current = view;
-    if (view !== "learned") return;
-
-    // 처음 진입: 정렬 스냅샷(왕체크 하단, 해제된 건 제외). learnedWords가 이미 그 순서.
-    if (!wasLearned) {
-      setLearnedDisplay(learnedWords);
-      return;
-    }
-
-    // 진입 후 progress 변경: 순서·구성 그대로 유지. 새로 외운 단어만 뒤에 추가.
-    // (해제·왕체크는 제자리에서 색만 바뀌고, 목록에서 빼지 않는다.)
-    setLearnedDisplay((prev) => {
-      const shown = new Set(prev.map((w) => w.id));
-      const additions = learnedWords.filter((w) => !shown.has(w.id));
-      return additions.length ? [...prev, ...additions] : prev;
-    });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [learnedWords, view]);
-
-  function dismissHint() {
-    try {
-      localStorage.setItem(HINT_KEY, "1");
-    } catch {
-      /* noop */
-    }
-    setShowHint(false);
+  function onTestPassed(score: number) {
+    const today = dayKey();
+    setActivity(recordDone(userId, today, score));
+    updatePlan({ testPassed: true, bestScore: score, completedDay: today });
   }
+
+  // ── 파생 데이터 ──
+  const bandPool = useMemo(() => (band ? poolFor(band) : []), [band, words]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const planWords = useMemo(() => {
+    if (!plan) return { list: [] as Word[], newCount: 0 };
+    const byId = new Map(words.map((w) => [w.id, w]));
+    const news = plan.newIds.map((id) => byId.get(id)).filter(Boolean) as Word[];
+    const revs = plan.reviewIds.map((id) => byId.get(id)).filter(Boolean) as Word[];
+    return { list: [...news, ...revs], newCount: news.length };
+  }, [plan, words]);
+
+  const bookWords = useMemo(() => {
+    const seen = bandPool.filter((w) => (progress[w.id]?.seenCount ?? 0) > 0);
+    // 학습 중 → 외움 → 완전 암기 순. 그룹 안에서는 최근 본 순.
+    const rank = (w: Word) => (isRetired(progress[w.id]) ? 2 : isKnown(progress[w.id]) ? 1 : 0);
+    return seen.sort(
+      (a, b) => rank(a) - rank(b) || (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
+    );
+  }, [bandPool, progress]);
+
+  const streak = useMemo(() => streakOf(activity), [activity]);
+  const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
 
   function go(v: View) {
     setView(v);
     setMenuOpen(false);
   }
 
-  // ── 로딩 / 로그인 화면 ──
+  // ── 로딩 / 로그인 ──
   if (phase === "loading") {
     return (
-      <main className="flex min-h-full items-center justify-center text-sm text-neutral-500">
+      <main className="flex min-h-full items-center justify-center text-sm text-mut">
         불러오는 중...
       </main>
     );
   }
   if (phase === "login") return <Login />;
 
-  // ── 난이도 선택 화면 ──
-  if (!band) {
+  // ── 난이도 선택 ──
+  if (!band || !plan) {
     return (
       <main className="mx-auto flex min-h-full max-w-md flex-col justify-center gap-6 px-6">
         <div>
-          <h1 className="text-2xl font-bold text-white">일본어 단어 암기</h1>
-          <p className="mt-2 text-sm text-neutral-400">
-            난이도를 고르면 단어 학습지가 만들어져요. 나중에 바꿀 수 있어요.
+          <h1 className="text-2xl font-extrabold text-ink">일본어 하루 코스</h1>
+          <p className="mt-2 text-sm text-sub">
+            난이도를 고르면 오늘의 코스(단어 + 작문 + 시험)가 만들어져요.
           </p>
         </div>
         <div className="flex flex-col gap-3">
@@ -329,12 +290,10 @@ export default function App() {
             <button
               key={b.id}
               onClick={() => chooseBand(b.id)}
-              className="rounded-2xl border border-white/10 bg-neutral-900 px-5 py-4 text-left transition hover:border-emerald-400/50 hover:bg-neutral-800"
+              className="rounded-3xl bg-card px-5 py-4 text-left shadow-soft transition hover:shadow-pop active:scale-[0.98]"
             >
-              <div className="text-lg font-semibold text-white">{b.label}</div>
-              <div className="mt-0.5 text-xs text-neutral-500">
-                {poolFor(b.id).length}개 단어
-              </div>
+              <div className="text-lg font-bold text-ink">{b.label}</div>
+              <div className="mt-0.5 text-xs text-mut">{poolFor(b.id).length}개 단어</div>
             </button>
           ))}
         </div>
@@ -342,15 +301,91 @@ export default function App() {
     );
   }
 
-  // ── 학습 화면 ──
+  const scenario = scenarioOf(plan);
+  const focusMode = FOCUS_VIEWS.includes(view);
+
+  // ── 코스 집중 화면 (하단 네비 없음) ──
+  if (view === "learn") {
+    return (
+      <main className="min-h-full">
+        <DailyLearn
+          words={planWords.list}
+          newCount={planWords.newCount}
+          startIndex={plan.learnIndex}
+          onSeen={onSeen}
+          onProgress={(i) => updatePlan({ learnIndex: i })}
+          onDone={() => {
+            updatePlan({ learnDone: true });
+            setView("home");
+          }}
+          onExit={() => setView("home")}
+        />
+        <CardOverlay card={card} setCard={setCard} />
+      </main>
+    );
+  }
+
+  if (view === "speak") {
+    return (
+      <main className="h-full">
+        <Speaking
+          scenario={scenario}
+          level={BANDS.find((b) => b.id === band)?.label ?? band}
+          focusWords={planWords.list.slice(0, Math.min(3, planWords.newCount))}
+          dictionary={words}
+          initialIntro={plan.speakIntro}
+          initialTurns={plan.speakTurns}
+          onState={(intro, turns, answered) =>
+            updatePlan({ speakIntro: intro, speakTurns: turns, speakStep: answered })
+          }
+          onDone={() => {
+            updatePlan({ speakDone: true });
+            setView("home");
+          }}
+          onSkip={() => {
+            updatePlan({ speakSkipped: true });
+            setView("home");
+          }}
+          onExit={() => setView("home")}
+          onShowCard={(word, x, y) =>
+            setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
+        />
+        <CardOverlay card={card} setCard={setCard} />
+      </main>
+    );
+  }
+
+  if (view === "test") {
+    return (
+      <main className="min-h-full">
+        <DailyTest
+          words={planWords.list}
+          bandWords={bandPool}
+          onApplyResults={applyQuizResults}
+          onPassed={onTestPassed}
+          onExit={() => setView("home")}
+        />
+      </main>
+    );
+  }
+
+  // ── 일반 화면 (헤더 + 하단 네비) ──
   return (
-    <main className="mx-auto max-w-2xl px-3 pt-5 pb-[calc(9rem_+_env(safe-area-inset-bottom))] sm:px-5">
-      <header className="mb-3 flex flex-wrap items-center gap-3">
-        <h1 className="text-lg font-bold text-white">일본어 단어 암기</h1>
+    <main
+      className={[
+        "mx-auto max-w-2xl px-4 pt-4 sm:px-5",
+        focusMode ? "pb-6" : "pb-[calc(6.5rem_+_env(safe-area-inset-bottom))]",
+      ].join(" ")}
+    >
+      <header className="mb-4 flex items-center gap-3">
+        <h1 className="text-lg font-extrabold text-ink">
+          {view === "wordbook" ? "단어장 📚" : "일본어 하루 코스"}
+        </h1>
         <select
           value={band}
           onChange={(e) => chooseBand(e.target.value as Band)}
-          className="rounded-lg border border-white/10 bg-neutral-900 px-2 py-1 text-sm text-neutral-200"
+          className="rounded-xl bg-card px-2.5 py-1.5 text-sm font-semibold text-sub shadow-soft"
         >
           {BANDS.map((b) => (
             <option key={b.id} value={b.id}>
@@ -358,152 +393,63 @@ export default function App() {
             </option>
           ))}
         </select>
-        {/* 보조 기능: 닮은꼴·튜터·계정을 '더보기' 메뉴로 모음 */}
-        <div className="relative ml-auto">
-          <button
-            onClick={() => setMenuOpen((o) => !o)}
-            aria-haspopup="menu"
-            aria-expanded={menuOpen}
-            className="rounded-lg border border-white/10 bg-neutral-900 px-2.5 py-1 text-sm text-neutral-300 transition hover:border-white/25 hover:text-neutral-100"
-          >
-            더보기 ⋯
-          </button>
-          {menuOpen && (
-            <>
-              <button
-                type="button"
-                aria-label="메뉴 닫기"
-                className="fixed inset-0 z-40 cursor-default"
-                onClick={() => setMenuOpen(false)}
-              />
-              <div
-                role="menu"
-                className="absolute right-0 z-50 mt-2 w-48 overflow-hidden rounded-xl border border-white/10 bg-neutral-900 py-1 shadow-xl shadow-black/50"
-              >
-                <button
-                  role="menuitem"
-                  onClick={() => go("quiz")}
-                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
-                >
-                  단어 시험 📝
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => go("kanji")}
-                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
-                >
-                  닮은꼴 한자
-                </button>
-                <button
-                  role="menuitem"
-                  onClick={() => go("reference")}
-                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
-                >
-                  특수 암기 📒
-                </button>
-                {CLOUD && userId && (
-                  <button
-                    role="menuitem"
-                    onClick={() => go("tutor")}
-                    className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
-                  >
-                    튜터 💬
-                  </button>
-                )}
-                {CLOUD && userId && (
-                  <>
-                    <div className="my-1 h-px bg-white/10" />
-                    <button
-                      role="menuitem"
-                      onClick={() => go("account")}
-                      className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5"
-                    >
-                      🔑 비밀번호 설정
-                    </button>
-                    <button
-                      role="menuitem"
-                      onClick={() => {
-                        setMenuOpen(false);
-                        supabase!.auth.signOut({ scope: "local" });
-                      }}
-                      className="block w-full px-4 py-2 text-left text-sm text-neutral-400 hover:bg-white/5 hover:text-neutral-200"
-                    >
-                      로그아웃
-                    </button>
-                  </>
-                )}
-                {/* 새 버전 받기: iOS PWA는 새로고침 수단이 없어 여기서 강제 업데이트 */}
-                <div className="my-1 h-px bg-white/10" />
-                <button
-                  role="menuitem"
-                  disabled={updating}
-                  onClick={() => {
-                    setUpdating(true);
-                    void forceUpdate();
-                  }}
-                  className="block w-full px-4 py-2 text-left text-sm text-neutral-200 hover:bg-white/5 disabled:opacity-60"
-                >
-                  {updating ? "새 버전 확인 중…" : "🔄 새 버전 받기"}
-                </button>
-                <div className="px-4 pb-1.5 pt-0.5 text-[11px] text-neutral-500">
-                  버전 {BUILD_ID}
-                </div>
-              </div>
-            </>
-          )}
-        </div>
       </header>
 
-      {/* 탭: 학습지 / 외운 단어 */}
-      <div className="mb-4 flex gap-1 rounded-xl bg-neutral-900 p-1 text-sm">
-        <button
-          onClick={() => setView("study")}
-          className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-            view === "study"
-              ? "bg-neutral-700 text-white"
-              : "text-neutral-400 hover:text-neutral-200"
-          }`}
-        >
-          학습지
-        </button>
-        <button
-          onClick={() => setView("learned")}
-          className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-            view === "learned"
-              ? "bg-neutral-700 text-white"
-              : "text-neutral-400 hover:text-neutral-200"
-          }`}
-        >
-          외운 단어 {learnedWords.length}
-        </button>
-        {CLOUD && userId && (
-          <button
-            onClick={() => setView("scan")}
-            className={`flex-1 rounded-lg px-3 py-1.5 transition ${
-              view === "scan"
-                ? "bg-neutral-700 text-white"
-                : "text-neutral-400 hover:text-neutral-200"
-            }`}
-          >
-            촬영 📷
-          </button>
-        )}
-      </div>
-
-      {(view === "kanji" ||
-        view === "tutor" ||
-        view === "account" ||
-        view === "quiz" ||
-        view === "reference") && (
-        <button
-          onClick={() => setView("study")}
-          className="mb-3 -mt-1 text-sm text-neutral-400 transition hover:text-neutral-200"
-        >
-          ← 학습으로 돌아가기
+      {(view === "kanji" || view === "tutor" || view === "account" || view === "quiz" || view === "reference") && (
+        <button onClick={() => setView("home")} className="mb-3 -mt-1 text-sm font-semibold text-sub transition hover:text-ink">
+          ← 홈으로
         </button>
       )}
 
-      {view === "account" ? (
+      {view === "home" ? (
+        <Home
+          plan={plan}
+          scenario={scenario}
+          activity={activity}
+          streak={streak}
+          stats={stats}
+          bandLabel={BANDS.find((b) => b.id === band)?.label ?? band}
+          newCount={planWords.newCount}
+          reviewCount={planWords.list.length - planWords.newCount}
+          learnTotal={planWords.list.length}
+          onStart={(step) => setView(step)}
+          onNewCycle={newCycle}
+        />
+      ) : view === "wordbook" ? (
+        bookWords.length === 0 ? (
+          <div className="rounded-3xl bg-card px-6 py-14 text-center text-sm text-mut shadow-soft">
+            아직 배운 단어가 없어요.
+            <br />
+            오늘의 코스에서 단어를 만나면 여기에 쌓여요.
+          </div>
+        ) : (
+          <>
+            <div className="mb-3 flex items-center gap-2">
+              <p className="text-xs leading-relaxed text-mut">
+                지금까지 배운 {bookWords.length}단어. 꾹 누르면 정답,{" "}
+                <b className="text-sub">단어를 빠르게 두 번 탭</b>하면 체크 토글!
+              </p>
+              <button
+                onClick={() => setBookReverse((v) => !v)}
+                className="ml-auto shrink-0 rounded-xl bg-card px-3 py-1.5 text-xs font-bold text-pri-deep shadow-soft transition active:scale-95"
+              >
+                {bookReverse ? "한국어 → 일본어" : "일본어 → 한국어"} ⇄
+              </button>
+            </div>
+            <WordTable
+              words={bookWords}
+              progress={progress}
+              mode={bookReverse ? "ko" : "jp"}
+              onShowCard={(word, x, y) =>
+                setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+              }
+              onKnown={(id) => update(id, markKnown)}
+              onUnknown={(id) => update(id, markUnknown)}
+              onRetire={(id) => update(id, markRetired)}
+            />
+          </>
+        )
+      ) : view === "account" ? (
         <SetPassword inline />
       ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
@@ -511,140 +457,130 @@ export default function App() {
         <Chat />
       ) : view === "quiz" ? (
         <Quiz
-          pool={
-            band
-              ? poolFor(band).filter((w) => (progress[w.id]?.seenCount ?? 0) > 0)
-              : []
-          }
-          bandWords={band ? poolFor(band) : []}
+          pool={bandPool.filter((w) => (progress[w.id]?.seenCount ?? 0) > 0)}
+          bandWords={bandPool}
           progress={progress}
           onApplyResults={applyQuizResults}
-          onClose={() => setView("study")}
+          onClose={() => setView("home")}
         />
       ) : view === "reference" ? (
         <Reference />
-      ) : view === "kanji" ? (
-        <ConfusableCards userId={userId} />
-      ) : view === "study" ? (
-        <>
-          <div className="mb-3 flex items-center gap-2">
-            <div className="ml-auto flex shrink-0 items-center gap-2">
-              <button
-                onClick={() => setStudyReverse((v) => !v)}
-                className="rounded-lg border border-white/10 bg-neutral-900 px-3 py-1.5 text-sm font-medium text-neutral-200 transition hover:border-emerald-400/50"
-                title="보기 방향 전환"
-              >
-                {studyReverse ? "뜻 → 단어" : "단어 → 뜻"}
-              </button>
-              <button
-                onClick={() => regenerate()}
-                className="rounded-lg bg-emerald-500/20 px-3 py-1.5 text-sm font-medium text-emerald-300 transition hover:bg-emerald-500/30"
-              >
-                새 학습지 ↻
-              </button>
-            </div>
-          </div>
-
-          <WordTable
-            words={worksheet}
-            progress={progress}
-            mode={studyReverse ? "ko" : "jp"}
-            onShowCard={(word, x, y) =>
-              setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-            }
-            onKnown={(id) => update(id, markKnown)}
-            onUnknown={(id) => update(id, markUnknown)}
-            onRetire={(id) => update(id, markRetired)}
-          />
-        </>
-      ) : learnedDisplay.length === 0 ? (
-        <div className="rounded-2xl border border-white/10 bg-neutral-950/60 px-6 py-12 text-center text-sm text-neutral-500">
-          아직 외운 단어가 없어요.
-          <br />
-          학습지에서 <span className="text-emerald-300">✓</span> 로 체크하면 여기에
-          모여요.
-        </div>
       ) : (
-        <>
-          <div className="mb-3 flex items-center gap-2">
-            <p className="text-xs text-neutral-500">
-              외운 단어예요. 꾹 누르면 정답이 보이고, 체크는 금색(완전 암기)→해제
-              순으로 바뀌어요.
-            </p>
-            <button
-              onClick={() => setLearnedReverse((v) => !v)}
-              className="ml-auto shrink-0 rounded-lg border border-white/10 bg-neutral-900 px-3 py-1.5 text-xs font-medium text-neutral-200 transition hover:border-emerald-400/50"
-              title="보기 방향 전환"
-            >
-              {learnedReverse ? "뜻 → 단어 ✓" : "단어 → 뜻"}
-            </button>
-          </div>
-          <WordTable
-            words={learnedDisplay}
-            progress={progress}
-            mode={learnedReverse ? "ko" : "jp"}
-            onShowCard={(word, x, y) =>
-              setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-            }
-            onKnown={(id) => update(id, markKnown)}
-            onUnknown={(id) => update(id, markUnknown)}
-            onRetire={(id) => update(id, markRetired)}
-          />
-        </>
+        <ConfusableCards userId={userId} />
       )}
 
-      {card && (
+      <CardOverlay card={card} setCard={setCard} />
+
+      {/* 하단 네비 */}
+      <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        <div className="mx-auto flex max-w-2xl items-stretch justify-around px-2">
+          <NavBtn label="홈" icon="🏠" active={view === "home"} onClick={() => go("home")} />
+          <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
+          {CLOUD && userId && (
+            <NavBtn label="촬영" icon="📷" active={view === "scan"} onClick={() => go("scan")} />
+          )}
+          <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
+        </div>
+      </nav>
+
+      {/* 더보기 시트 */}
+      {menuOpen && (
         <>
-          {/* 바깥(또는 카드)을 탭하면 닫힘 */}
           <button
             type="button"
-            aria-label="카드 닫기"
-            className="fixed inset-0 z-40 cursor-default"
-            onClick={() => setCard(null)}
+            aria-label="메뉴 닫기"
+            className="fixed inset-0 z-40 cursor-default bg-ink/20"
+            onClick={() => setMenuOpen(false)}
           />
-          <WordCard word={card.word} x={card.x} y={card.y} />
+          <div className="fixed inset-x-0 bottom-0 z-50 mx-auto max-w-2xl rounded-t-3xl bg-card p-4 pb-[calc(1.25rem_+_env(safe-area-inset-bottom))] shadow-pop">
+            <div className="mx-auto mb-3 h-1.5 w-10 rounded-full bg-line" />
+            <div className="grid grid-cols-2 gap-2">
+              <SheetBtn icon="📝" label="자유 단어시험" onClick={() => go("quiz")} />
+              <SheetBtn icon="🈯" label="닮은꼴 한자" onClick={() => go("kanji")} />
+              <SheetBtn icon="📒" label="특수 암기" onClick={() => go("reference")} />
+              {CLOUD && userId && <SheetBtn icon="💬" label="튜터" onClick={() => go("tutor")} />}
+              {CLOUD && userId && <SheetBtn icon="🔑" label="비밀번호 설정" onClick={() => go("account")} />}
+              {CLOUD && userId && (
+                <SheetBtn
+                  icon="🚪"
+                  label="로그아웃"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    supabase!.auth.signOut({ scope: "local" });
+                  }}
+                />
+              )}
+              <SheetBtn
+                icon="🔄"
+                label={updating ? "새 버전 확인 중…" : "새 버전 받기"}
+                onClick={() => {
+                  setUpdating(true);
+                  void forceUpdate();
+                }}
+              />
+            </div>
+            <div className="mt-3 text-center text-[11px] text-mut">버전 {BUILD_ID}</div>
+          </div>
         </>
       )}
-
-      {/* 첫 접속 1회: 학습지 사용법 안내 */}
-      {showHint && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center bg-black/60 px-6"
-          onClick={dismissHint}
-        >
-          <div
-            className="w-full max-w-sm rounded-2xl border border-white/10 bg-neutral-900 p-5 shadow-2xl shadow-black/60"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 className="text-base font-bold text-white">학습지 사용법</h2>
-            <ul className="mt-3 space-y-2 text-sm text-neutral-300">
-              <li>
-                · <b className="text-neutral-100">오른쪽 영역을 꾹 누르면</b> 정답(독음·뜻)이
-                잠깐 보여요.
-              </li>
-              <li>
-                · <b className="text-neutral-100">왼쪽 단어를 누르면</b> 상세 카드가 떠요.
-              </li>
-              <li>
-                · 다 외웠으면 오른쪽 <span className="text-emerald-300">✓</span> 를 눌러
-                체크하세요. 한 번 더 누르면{" "}
-                <span className="text-amber-300">금색(완전 암기)</span> — 학습지에 다시
-                안 나와요.
-              </li>
-              <li>
-                · 상단 <b className="text-neutral-100">방향 전환</b> 버튼으로 한국어→일본어로도
-                연습할 수 있어요.
-              </li>
-            </ul>
-            <button
-              onClick={dismissHint}
-              className="mt-4 w-full rounded-xl bg-emerald-500 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-400"
-            >
-              알겠어요
-            </button>
-          </div>
-        </div>
-      )}
     </main>
+  );
+}
+
+function CardOverlay({
+  card,
+  setCard,
+}: {
+  card: { word: Word; x: number; y: number } | null;
+  setCard: (c: null) => void;
+}) {
+  if (!card) return null;
+  return (
+    <>
+      <button
+        type="button"
+        aria-label="카드 닫기"
+        className="fixed inset-0 z-40 cursor-default"
+        onClick={() => setCard(null)}
+      />
+      <WordCard word={card.word} x={card.x} y={card.y} />
+    </>
+  );
+}
+
+function NavBtn({
+  label,
+  icon,
+  active,
+  onClick,
+}: {
+  label: string;
+  icon: string;
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={[
+        "flex flex-1 flex-col items-center gap-0.5 py-2.5 text-[11px] font-bold transition",
+        active ? "text-pri-deep" : "text-mut hover:text-sub",
+      ].join(" ")}
+    >
+      <span className={["text-xl transition", active ? "scale-110" : ""].join(" ")}>{icon}</span>
+      {label}
+    </button>
+  );
+}
+
+function SheetBtn({ icon, label, onClick }: { icon: string; label: string; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-2.5 rounded-2xl bg-base px-4 py-3 text-left text-sm font-bold text-ink transition hover:bg-pri-soft active:scale-[0.98]"
+    >
+      <span className="text-lg">{icon}</span>
+      {label}
+    </button>
   );
 }

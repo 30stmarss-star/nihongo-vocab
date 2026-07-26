@@ -80,6 +80,19 @@ export function touch(p: Progress | undefined, now: number): Progress {
   return { mastery: p.mastery, lastSeen: now, seenCount: p.seenCount };
 }
 
+/** 복습 만기 여부 — 하루 코스에서 '오늘의 복습' 후보를 고를 때 사용 */
+export function isDue(p: Progress | undefined, now: number): boolean {
+  if (!p || p.seenCount === 0 || isRetired(p)) return false;
+  const interval = INTERVALS_DAYS[Math.min(p.mastery, 5)] * DAY;
+  return now - p.lastSeen >= interval;
+}
+
+/** 만기 초과 비율(1=딱 만기, 클수록 오래 밀림). 복습 우선순위 정렬용. */
+export function overdueRatio(p: Progress, now: number): number {
+  const interval = INTERVALS_DAYS[Math.min(p.mastery, 5)] * DAY;
+  return interval <= 0 ? 1 : (now - p.lastSeen) / interval;
+}
+
 /** 중요도(freq)를 '부드러운' 배수로. 결정적 정렬이 아니라 확률 가중치라 매번 다양하다. */
 function importanceFactor(freq?: number): number {
   const f = freq ?? 2;
