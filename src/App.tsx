@@ -38,7 +38,6 @@ import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
-import { SetPassword } from "./components/SetPassword";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
 import { Home } from "./components/Home";
@@ -56,7 +55,6 @@ type View =
   | "scan"
   | "kanji"
   | "tutor"
-  | "account"
   | "quiz"
   | "reference";
 
@@ -395,7 +393,7 @@ export default function App() {
         </select>
       </header>
 
-      {(view === "kanji" || view === "tutor" || view === "account" || view === "quiz" || view === "reference") && (
+      {(view === "kanji" || view === "tutor" || view === "quiz" || view === "reference") && (
         <button onClick={() => setView("home")} className="mb-3 -mt-1 text-sm font-semibold text-sub transition hover:text-ink">
           ← 홈으로
         </button>
@@ -449,8 +447,6 @@ export default function App() {
             />
           </>
         )
-      ) : view === "account" ? (
-        <SetPassword inline />
       ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
       ) : view === "tutor" ? (
@@ -499,7 +495,6 @@ export default function App() {
               <SheetBtn icon="🈯" label="닮은꼴 한자" onClick={() => go("kanji")} />
               <SheetBtn icon="📒" label="특수 암기" onClick={() => go("reference")} />
               {CLOUD && userId && <SheetBtn icon="💬" label="튜터" onClick={() => go("tutor")} />}
-              {CLOUD && userId && <SheetBtn icon="🔑" label="비밀번호 설정" onClick={() => go("account")} />}
               {CLOUD && userId && (
                 <SheetBtn
                   icon="🚪"
