@@ -2,6 +2,7 @@ import type { Word } from "../data/types";
 import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
 import { KanjiInsight } from "./KanjiInsight";
+import { ConjugationTable } from "./ConjugationTable";
 
 /** 단어 상세 카드. inBook/onAddBook을 주면 '단어장에 넣기' 버튼이 붙는다. */
 export function WordCard({
@@ -95,6 +96,7 @@ export function WordCard({
           </ul>
         </div>
 
+        <ConjugationTable word={word} />
         {word.kanji !== word.kana && <KanjiInsight word={word} />}
 
         {onAddBook && (

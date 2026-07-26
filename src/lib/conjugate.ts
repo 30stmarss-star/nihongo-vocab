@@ -93,6 +93,127 @@ function naAdjForms(dict: string): string[] {
   return [dict, ...["な", "に", "で", "だ", "です", "だった", "でした", "じゃない"].map((t) => dict + t)];
 }
 
+// ── 학습용 활용표 ──
+// 문장 매칭용 목록과 달리, 여기서는 '외울 가치가 있는 대표형'만 이름표를 달아 낸다.
+
+export interface Conjugation {
+  label: string;
+  form: string;
+  hint: string;
+}
+
+function godanTable(dict: string): Conjugation[] {
+  const row = GODAN[dict.slice(-1)];
+  if (!row) return [];
+  const s = dict.slice(0, -1);
+  return [
+    { label: "정중형", form: s + row.i + "ます", hint: "~합니다" },
+    { label: "정중 과거", form: s + row.i + "ました", hint: "~했습니다" },
+    { label: "정중 부정", form: s + row.i + "ません", hint: "~하지 않습니다" },
+    { label: "て형", form: s + row.te, hint: "~하고, ~해서 (문장 연결)" },
+    { label: "진행", form: s + row.te + "います", hint: "~하고 있습니다" },
+    { label: "과거", form: s + row.ta, hint: "~했다 (반말)" },
+    { label: "부정", form: s + row.a + "ない", hint: "~하지 않는다" },
+    { label: "가능", form: s + row.e + "る", hint: "~할 수 있다" },
+    { label: "의지", form: s + row.o + "う", hint: "~하자, ~해야지" },
+    { label: "조건", form: s + row.e + "ば", hint: "~하면" },
+  ];
+}
+
+function ichidanTable(dict: string): Conjugation[] {
+  if (!dict.endsWith("る")) return [];
+  const s = dict.slice(0, -1);
+  return [
+    { label: "정중형", form: s + "ます", hint: "~합니다" },
+    { label: "정중 과거", form: s + "ました", hint: "~했습니다" },
+    { label: "정중 부정", form: s + "ません", hint: "~하지 않습니다" },
+    { label: "て형", form: s + "て", hint: "~하고, ~해서 (문장 연결)" },
+    { label: "진행", form: s + "ています", hint: "~하고 있습니다" },
+    { label: "과거", form: s + "た", hint: "~했다 (반말)" },
+    { label: "부정", form: s + "ない", hint: "~하지 않는다" },
+    { label: "가능·수동", form: s + "られる", hint: "~할 수 있다 / ~당하다" },
+    { label: "의지", form: s + "よう", hint: "~하자, ~해야지" },
+    { label: "조건", form: s + "れば", hint: "~하면" },
+  ];
+}
+
+function irregularTable(dict: string): Conjugation[] {
+  if (dict.endsWith("する")) {
+    const s = dict.slice(0, -2);
+    return [
+      { label: "정중형", form: s + "します", hint: "~합니다" },
+      { label: "정중 과거", form: s + "しました", hint: "~했습니다" },
+      { label: "정중 부정", form: s + "しません", hint: "~하지 않습니다" },
+      { label: "て형", form: s + "して", hint: "~하고, ~해서" },
+      { label: "진행", form: s + "しています", hint: "~하고 있습니다" },
+      { label: "과거", form: s + "した", hint: "~했다 (반말)" },
+      { label: "부정", form: s + "しない", hint: "~하지 않는다" },
+      { label: "가능", form: s + "できる", hint: "~할 수 있다" },
+      { label: "의지", form: s + "しよう", hint: "~하자" },
+      { label: "조건", form: s + "すれば", hint: "~하면" },
+    ];
+  }
+  if (dict.endsWith("来る") || dict.endsWith("くる")) {
+    const kanji = dict.endsWith("来る");
+    const s = dict.slice(0, -2);
+    const i = kanji ? s + "来" : s + "き";
+    const a = kanji ? s + "来" : s + "こ";
+    return [
+      { label: "정중형", form: i + "ます", hint: "옵니다" },
+      { label: "정중 과거", form: i + "ました", hint: "왔습니다" },
+      { label: "て형", form: i + "て", hint: "오고, 와서" },
+      { label: "과거", form: i + "た", hint: "왔다 (반말)" },
+      { label: "부정", form: a + "ない", hint: "오지 않는다" },
+      { label: "의지", form: a + "よう", hint: "오자" },
+    ];
+  }
+  return [];
+}
+
+function iAdjTable(dict: string): Conjugation[] {
+  if (!dict.endsWith("い")) return [];
+  const s = dict.slice(0, -1);
+  return [
+    { label: "정중형", form: dict + "です", hint: "~합니다" },
+    { label: "과거", form: s + "かった", hint: "~했다" },
+    { label: "정중 과거", form: s + "かったです", hint: "~했습니다" },
+    { label: "부정", form: s + "くない", hint: "~하지 않다" },
+    { label: "연결", form: s + "くて", hint: "~하고, ~해서" },
+    { label: "부사형", form: s + "く", hint: "~하게 (동사 꾸밈)" },
+    { label: "조건", form: s + "ければ", hint: "~하면" },
+  ];
+}
+
+function naAdjTable(dict: string): Conjugation[] {
+  return [
+    { label: "정중형", form: dict + "です", hint: "~합니다" },
+    { label: "명사 수식", form: dict + "な", hint: "~한 (뒤에 명사)" },
+    { label: "부사형", form: dict + "に", hint: "~하게" },
+    { label: "과거", form: dict + "だった", hint: "~했다" },
+    { label: "정중 과거", form: dict + "でした", hint: "~했습니다" },
+    { label: "부정", form: dict + "じゃない", hint: "~하지 않다" },
+    { label: "연결", form: dict + "で", hint: "~하고" },
+  ];
+}
+
+/** 이 단어의 대표 활용형 표. 활용하지 않는 품사면 빈 배열. */
+export function conjugationTable(word: Word, dict: string): Conjugation[] {
+  switch (word.type.kind) {
+    case "verb":
+      return word.type.group === 1
+        ? godanTable(dict)
+        : word.type.group === 2
+          ? ichidanTable(dict)
+          : irregularTable(dict);
+    case "i-adj":
+      return iAdjTable(dict);
+    case "na-adj":
+      return naAdjTable(dict);
+    default:
+      return [];
+  }
+}
+
 /** 이 단어가 문장에 나타날 수 있는 표기들 (사전형 포함) */
 export function surfaceForms(word: Word, dict: string): string[] {
   switch (word.type.kind) {

@@ -34,7 +34,6 @@ import {
   savePlan,
   streakOf,
   syncActivity,
-  addDays,
   dayKey,
   type ActivityLog,
   type DailyPlan,
@@ -71,6 +70,12 @@ type Phase = "loading" | "login" | "ready";
 
 /** 코스 진행 화면(전체 화면 집중 모드) — 하단 네비를 숨긴다 */
 const FOCUS_VIEWS: View[] = ["learn", "speak", "test"];
+
+/** 단어장 정렬 기준: 0=어려움(아직 못 외움) 1=쉬움 2=완전 암기 */
+function difficultyRank(w: Word, progress: ProgressMap): 0 | 1 | 2 {
+  const p = progress[w.id];
+  return isRetired(p) ? 2 : isKnown(p) ? 1 : 0;
+}
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>("loading");
@@ -271,16 +276,13 @@ export default function App() {
     // 단어장 = 하루 코스를 마친 단어 + 촬영 단어 + (예전 방식에서) 체크했던 단어.
     // 레벨(밴드)과 무관하게 전부 보여준다 — 내가 거쳐온 단어 모음이니까.
     const list = words.filter((w) => wordbook.has(w.id) || isKnown(progress[w.id]));
-    // 완전 암기는 하단으로. 그 외에는 담은 날짜 최신순(같은 날이면 최근 본 순).
-    const rank = (w: Word) => (isRetired(progress[w.id]) ? 1 : 0);
-    const day = (w: Word) => wordbook.get(w.id) ?? "";
+    // 어려움(아직 못 외움) → 쉬움 → 완전 암기 순. 같은 묶음 안에서는 최근 본 순.
     return list.sort(
       (a, b) =>
-        rank(a) - rank(b) ||
-        day(b).localeCompare(day(a)) ||
+        difficultyRank(a, progress) - difficultyRank(b, progress) ||
         (progress[b.id]?.lastSeen ?? 0) - (progress[a.id]?.lastSeen ?? 0)
     );
-  }, [words, wordbook, progress]);
+  }, [words, progress, wordbook]);
 
   // 단어장 표시 목록은 '세션 스냅샷': 탭에 들어올 때만 재정렬하고,
   // 안에서 체크를 바꿔도 행이 제자리에 있게 한다(체크 풀자마자 튀지 않게).
@@ -302,34 +304,19 @@ export default function App() {
     });
   }, [bookWords, view]);
 
-  // 단어장을 '배운 날짜'로 묶는다 — 언제 만난 단어인지가 기억을 돕는다.
-  // 완전 암기한 단어는 날짜와 무관하게 맨 아래 한 묶음으로.
+  // 단어장을 난이도로 묶는다 — 어려운 단어가 맨 위에 오도록.
   const bookGroups = useMemo(() => {
-    const byDay = new Map<string, Word[]>();
-    const done: Word[] = [];
-    for (const w of bookDisplay) {
-      if (isRetired(progress[w.id])) {
-        done.push(w);
-        continue;
-      }
-      const d = wordbook.get(w.id) ?? "";
-      const arr = byDay.get(d) ?? [];
-      arr.push(w);
-      byDay.set(d, arr);
-    }
-    const today = dayKey();
-    const yesterday = addDays(today, -1);
-    const label = (d: string) =>
-      !d ? "이전에 담은 단어" : d === today ? "오늘" : d === yesterday ? "어제" : d.replaceAll("-", ". ");
-    // 날짜 있는 그룹 최신순 → 날짜 없는 그룹 → 완전 암기
-    const dated = [...byDay.entries()].filter(([d]) => d).sort((a, b) => b[0].localeCompare(a[0]));
-    const undated = byDay.get("");
-    return [
-      ...dated.map(([d, list]) => ({ key: d, label: label(d), words: list, done: false })),
-      ...(undated?.length ? [{ key: "old", label: label(""), words: undated, done: false }] : []),
-      ...(done.length ? [{ key: "done", label: "⭐ 완전 암기", words: done, done: true }] : []),
+    const buckets: Word[][] = [[], [], []];
+    for (const w of bookDisplay) buckets[difficultyRank(w, progress)].push(w);
+    const meta = [
+      { key: "hard", label: "😵 어려움", tone: "text-coral" },
+      { key: "easy", label: "😎 쉬움", tone: "text-mint" },
+      { key: "done", label: "⭐ 완전 암기", tone: "text-gold" },
     ];
-  }, [bookDisplay, wordbook, progress]);
+    return meta
+      .map((m, i) => ({ ...m, words: buckets[i] }))
+      .filter((g) => g.words.length > 0);
+  }, [bookDisplay, progress]);
 
   const streak = useMemo(() => streakOf(activity), [activity]);
   const stats = useMemo(() => masteryStats(bandPool, progress), [bandPool, progress]);
@@ -432,6 +419,7 @@ export default function App() {
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
           }
           onSeen={onSeen}
+          onRate={(id, r) => update(id, r === "hard" ? markUnknown : markKnown)}
           onProgress={(i) => updatePlan({ learnIndex: i })}
           onDone={() => {
             updatePlan({ learnDone: true });
@@ -552,7 +540,7 @@ export default function App() {
               <p className="text-xs leading-relaxed text-mut">
                 내 단어 {bookDisplay.length}개. 꾹 누르면 정답,{" "}
                 <b className="text-sub">단어를 빠르게 두 번 탭</b>하면{" "}
-                <b className="text-gold">완전 암기</b> 체크!
+                <b className="text-gold">완전 암기</b>로 넘어가요.
               </p>
               <button
                 onClick={() => setBookReverse((v) => !v)}
@@ -565,14 +553,7 @@ export default function App() {
               {bookGroups.map((g) => (
                 <section key={g.key}>
                   <div className="mb-1.5 flex items-baseline gap-2 px-1">
-                    <h3
-                      className={[
-                        "text-sm font-extrabold",
-                        g.done ? "text-gold" : "text-ink",
-                      ].join(" ")}
-                    >
-                      {g.label}
-                    </h3>
+                    <h3 className={["text-sm font-extrabold", g.tone].join(" ")}>{g.label}</h3>
                     <span className="text-xs font-semibold text-mut">{g.words.length}개</span>
                   </div>
                   <WordTable

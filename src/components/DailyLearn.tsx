@@ -4,6 +4,7 @@ import { boundPrefix, typeLabel } from "../data/types";
 import { tradForm } from "../data/shinjitai";
 import { ExampleLine } from "./ExampleLine";
 import { KanjiInsight } from "./KanjiInsight";
+import { ConjugationTable } from "./ConjugationTable";
 
 /**
  * 오늘의 단어 — 카드 한 장씩 집중 학습.
@@ -18,12 +19,13 @@ interface Props {
   dictionary: Word[]; // 예문 속 단어 탭 → 카드용 사전
   onShowCard: (word: Word, x: number, y: number) => void;
   onSeen: (id: string) => void; // 카드가 처음 화면에 나옴(도입 기록)
+  onRate: (id: string, rating: "hard" | "easy") => void; // 어려움/쉬움 평가
   onProgress: (index: number) => void; // 이어하기 저장
   onDone: () => void;
   onExit: () => void;
 }
 
-export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard, onSeen, onProgress, onDone, onExit }: Props) {
+export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard, onSeen, onRate, onProgress, onDone, onExit }: Props) {
   const [idx, setIdx] = useState(Math.min(startIndex, Math.max(0, words.length - 1)));
   const [open, setOpen] = useState(false);
 
@@ -61,6 +63,12 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
     const next = idx + delta;
     if (next >= words.length) onDone();
     else if (next >= 0) setIdx(next);
+  }
+
+  /** 어려움/쉬움을 남기고 다음 카드로. 어려움은 복습에 빨리 돌아온다. */
+  function rate(r: "hard" | "easy") {
+    onRate(w.id, r);
+    go(1);
   }
 
   return (
@@ -140,6 +148,7 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
                 {examples.length > 0 && (
                   <div className="mt-2 text-[11px] text-mut">예문 속 단어를 탭하면 단어 카드가 떠요</div>
                 )}
+                <ConjugationTable word={w} />
                 {w.kanji !== w.kana && <KanjiInsight word={w} />}
               </div>
             ) : (
@@ -149,21 +158,40 @@ export function DailyLearn({ words, newCount, startIndex, dictionary, onShowCard
         </div>
       </div>
 
-      {/* 하단 버튼 */}
-      <div className="mt-5 flex gap-3">
-        <button
-          onClick={() => go(-1)}
-          disabled={idx === 0}
-          className="rounded-2xl bg-card px-5 py-3.5 font-bold text-sub shadow-soft transition active:scale-95 disabled:opacity-40"
-        >
-          ← 이전
-        </button>
-        <button
-          onClick={() => go(1)}
-          className="flex-1 rounded-2xl bg-pri py-3.5 font-bold text-white shadow-soft transition hover:bg-pri-deep active:scale-95"
-        >
-          {last ? "학습 완료 🎉" : "다음 단어 →"}
-        </button>
+      {/* 하단: 이 단어가 어땠는지 남기고 넘어간다 */}
+      <div className="mt-5">
+        <div className="flex gap-3">
+          <button
+            onClick={() => rate("hard")}
+            className="flex-1 rounded-2xl bg-coral py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+          >
+            😵 어려움
+          </button>
+          <button
+            onClick={() => rate("easy")}
+            className="flex-1 rounded-2xl bg-mint py-3.5 font-bold text-white shadow-soft transition hover:brightness-105 active:scale-95"
+          >
+            😎 쉬움
+          </button>
+        </div>
+        <div className="mt-2 flex items-center gap-3">
+          <button
+            onClick={() => go(-1)}
+            disabled={idx === 0}
+            className="rounded-xl px-2 py-1.5 text-sm font-bold text-mut transition disabled:opacity-40"
+          >
+            ← 이전
+          </button>
+          <span className="text-[11px] text-mut">
+            어려움은 복습에 빨리 돌아와요{last ? " · 마지막 카드예요" : ""}
+          </span>
+          <button
+            onClick={() => go(1)}
+            className="ml-auto rounded-xl px-2 py-1.5 text-sm font-bold text-mut transition"
+          >
+            {last ? "완료 →" : "건너뛰기 →"}
+          </button>
+        </div>
       </div>
     </div>
   );
