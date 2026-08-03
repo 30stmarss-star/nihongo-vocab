@@ -28,19 +28,35 @@ export function WordCard({
   // 후행 결합형(예: ~ながら)이면 표제어·독음 앞에 ~
   const pre = boundPrefix(word);
 
-  // 화면 밖으로 나가지 않도록 대략적으로 보정
+  /**
+   * 화면 안에 들어오도록 위치와 '쓸 수 있는 높이'를 같이 정한다.
+   * 높이 제한만 걸어두면(예전 max-h) 탭한 지점이 화면 중간일 때 카드가 아래로
+   * 삐져나간다 — 자기 박스는 넘치지 않으니 스크롤도 안 생겨 아래가 잘린 채 끝난다.
+   */
   const W = 320;
-  const left = Math.min(Math.max(12, x - W / 2), window.innerWidth - W - 12);
-  const flipUp = y > window.innerHeight * 0.55;
-  const top = flipUp ? undefined : y + 24;
-  const bottom = flipUp ? window.innerHeight - y + 24 : undefined;
+  const M = 12; // 화면 가장자리 여백
+  const GAP = 20; // 탭한 지점과 카드 사이
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  const left = Math.min(Math.max(M, x - W / 2), vw - W - M);
+  const above = y - GAP - M;
+  const below = vh - y - GAP - M;
+  const flipUp = above > below;
+  // 위아래 어느 쪽도 좁으면 탭 지점을 포기하고 화면 전체를 쓴다(그래야 스크롤이 산다)
+  const roomy = Math.max(above, below) >= 260;
+  const maxH = roomy ? Math.max(above, below) : vh - M * 2;
+  const top = roomy ? (flipUp ? undefined : y + GAP) : M;
+  const bottom = roomy && flipUp ? vh - y + GAP : undefined;
 
   return (
     <div
       className="no-select pointer-events-none fixed z-50"
       style={{ left, top, bottom, width: W }}
     >
-      <div className="pointer-events-auto max-h-[72vh] overflow-y-auto overscroll-contain rounded-3xl bg-card p-4 shadow-pop ring-1 ring-line">
+      <div
+        style={{ maxHeight: maxH }}
+        className="pointer-events-auto overflow-y-auto overscroll-contain rounded-3xl bg-card p-4 shadow-pop ring-1 ring-line"
+      >
         <div className="flex items-baseline gap-2">
           <span className="text-2xl font-bold text-ink">{pre}{word.kanji}</span>
           {tradWord && (

@@ -102,6 +102,12 @@ export interface Conjugation {
   hint: string;
 }
 
+/**
+ * 문제에 쓸 이름. 표에서는 '조건'으로 짧게 두지만 문제로 나가면
+ * "조건을 고르세요"가 되어 뭘 하라는 건지 모호해진다 — '조건형'으로 읽히게 한다.
+ */
+export const formName = (label: string) => (label.endsWith("형") ? label : label + "형");
+
 function godanTable(dict: string): Conjugation[] {
   const row = GODAN[dict.slice(-1)];
   if (!row) return [];

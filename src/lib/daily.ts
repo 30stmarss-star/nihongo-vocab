@@ -1,4 +1,5 @@
 import type { Band, Word } from "../data/types";
+import { choicesUsable } from "./quizgen";
 import { isDue, isKnown, isRetired, overdueRatio, type ProgressMap } from "./srs";
 import { CLOUD, supabase } from "./supabase";
 
@@ -78,6 +79,7 @@ export interface ExamItem {
   ko: string;
   choices: string[];
   answerIndex: number;
+  why?: string; // 다른 보기가 안 되는 이유 (모델의 검산 + 해설에 표시)
 }
 
 /** 작문 스피킹 한 소절(내 대사 또는 상대 대사) */
@@ -290,6 +292,40 @@ export async function generateScenario(
   }
 }
 
+// ── 받아온 문항 검사 ──
+// 모델이 가끔 사고를 친다: 보기 하나만 영어로 적거나(みなと를 "port"로), 정답이
+// 물어본 단어가 아니거나, 보기가 겹친다. 이런 문항은 버린다 — 그 단어는 규칙 문항으로 나간다.
+
+/** 일본어 글자(가나·한자)가 들어 있는가 */
+const hasJapanese = (s: string) => /[ぁ-んァ-ヶ一-龯々〆ー]/.test(s);
+/** 활용 꼬리를 뗀 어간 — 止める→止, 女性→女性, きれい→"" */
+const stemOf = (kanji: string) => kanji.replace(/[ぁ-んァ-ヶー]+$/, "");
+
+function looksValid(it: ExamItem, word?: { kanji: string; kana: string }): boolean {
+  if (!it || typeof it.kanji !== "string") return false;
+  if (!(it.answerIndex >= 0 && it.answerIndex < 4)) return false;
+  if (!["cloze", "synonym", "usage"].includes(it.kind)) return false;
+  // 보기는 전부 일본어여야 하고, 서로 달라야 한다
+  if (!choicesUsable(it.choices)) return false;
+  const choices = it.choices.map((c) => c.trim());
+
+  if (it.kind === "usage") return choices.every((c) => c.length > 3);
+  if (typeof it.sentence !== "string" || !hasJapanese(it.sentence)) return false;
+  // 문맥 규정은 빈칸이 실제로 있어야 문제가 된다
+  if (it.kind === "cloze" && !it.sentence.includes("＿")) return false;
+  // 유의 표현은 바꿔 쓸 자리가 표시돼 있어야 한다
+  if (it.kind === "synonym" && !(it.sentence.includes("【") && it.sentence.includes("】"))) return false;
+
+  // 빈칸의 정답은 물어본 그 단어(또는 그 활용형)여야 한다
+  if (it.kind === "cloze" && word) {
+    const ans = choices[it.answerIndex];
+    const stem = stemOf(word.kanji);
+    const kanaStem = stemOf(word.kana) || word.kana.slice(0, 2);
+    if (stem && !ans.includes(stem) && !ans.includes(kanaStem)) return false;
+  }
+  return true;
+}
+
 /**
  * 하루치 단어의 문장형 문항을 미리 만들어 온다 (코스 시작 시 백그라운드).
  * 실패하면 null — 시험은 규칙 기반 문항만으로도 성립한다.
@@ -306,18 +342,11 @@ export async function generateExam(
     if (error) throw error;
     if (data?.error) throw new Error(String(data.error));
     const raw = Array.isArray(data?.items) ? data.items : [];
-    const items: ExamItem[] = raw.filter(
-      (it: ExamItem) =>
-        it &&
-        typeof it.kanji === "string" &&
-        Array.isArray(it.choices) &&
-        it.choices.length === 4 &&
-        it.answerIndex >= 0 &&
-        it.answerIndex < 4 &&
-        ["cloze", "synonym", "usage"].includes(it.kind) &&
-        // 문맥 규정은 빈칸이 실제로 있어야 문제가 된다
-        (it.kind !== "cloze" || it.sentence.includes("＿"))
-    );
+    const byKanji = new Map(words.map((w) => [w.kanji, w]));
+    const items: ExamItem[] = raw.filter((it: ExamItem) => looksValid(it, byKanji.get(it?.kanji)));
+    if (items.length < raw.length) {
+      console.warn(`[exam] 이상한 문항 ${raw.length - items.length}개 버림(규칙 문항으로 대체)`);
+    }
     return items.length ? items : null;
   } catch (e) {
     console.warn("[exam] 문항 미리 생성 실패(규칙 문항으로 진행):", e instanceof Error ? e.message : e);

@@ -3,6 +3,7 @@ import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
 import { weightFor, type ProgressMap } from "../lib/srs";
 import { readingMatches } from "../lib/kana";
+import { choicesUsable } from "../lib/quizgen";
 import { supabase } from "../lib/supabase";
 
 /**
@@ -155,8 +156,8 @@ export function Quiz({ pool, bandWords, progress, onApplyResults, onClose }: Pro
           const it = items.find((x) => x.answerKanji === w.kanji);
           if (
             it &&
-            Array.isArray(it.choices) &&
-            it.choices.length === 4 &&
+            // 보기가 전부 일본어이고 서로 달라야 한다(영어 보기·중복 보기 사고 방지)
+            choicesUsable(it.choices) &&
             it.sentence.includes("＿") &&
             it.answerIndex >= 0 &&
             it.answerIndex < 4

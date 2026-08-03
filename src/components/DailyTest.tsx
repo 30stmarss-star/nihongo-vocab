@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { Word } from "../data/types";
 import { boundPrefix } from "../data/types";
+import { formName } from "../lib/conjugate";
 import { readingMatches } from "../lib/kana";
 import { isKnown, isRetired, type ProgressMap } from "../lib/srs";
 import type { ExamItem } from "../lib/daily";
@@ -64,8 +65,16 @@ function normalizeChoices(choices: string[], dictionary: Word[]): string[] {
 function toQuestion(item: ExamItem, w: Word, dictionary: Word[]): Question {
   // 통문장 보기(용법)는 손대지 않는다 — 단어 단위 보기만 표기를 맞춘다
   const choices = item.kind === "usage" ? item.choices : normalizeChoices(item.choices, dictionary);
-  const base = { word: w, sentence: item.sentence, ko: item.ko, choices, answer: item.answerIndex };
-  if (item.kind === "usage") return { kind: "usage", word: w, choices, answer: item.answerIndex };
+  const base = {
+    word: w,
+    sentence: item.sentence,
+    ko: item.ko,
+    choices,
+    answer: item.answerIndex,
+    why: item.why,
+  };
+  if (item.kind === "usage")
+    return { kind: "usage", word: w, choices, answer: item.answerIndex, why: item.why };
   return item.kind === "cloze" ? { kind: "cloze", ...base } : { kind: "synonym", ...base };
 }
 
@@ -107,7 +116,10 @@ function buildQuestions(
 
   const out: Question[] = [];
   for (const w of words) {
-    const sentence = (byKanji.get(w.kanji) ?? []).map((it) => toQuestion(it, w, pool));
+    // 표기를 맞추다가 보기가 겹쳐버린 문항은 버린다(けが·怪我가 둘 다 있던 경우)
+    const sentence = (byKanji.get(w.kanji) ?? [])
+      .map((it) => toQuestion(it, w, pool))
+      .filter((q) => !("choices" in q) || new Set(q.choices).size === q.choices.length);
     const rule = [readingQ(w, pool), writingQ(w, pool), meaningQ(w, pool), conjugateQ(w)].filter(
       Boolean
     ) as Question[];
@@ -440,9 +452,11 @@ export function DailyTest({
             {"ko" in q && q.ko && <div className="mt-1 text-xs text-sub">{q.ko}</div>}
             {q.kind === "conjugate" && (
               <div className="mt-1 text-xs text-sub">
-                {q.label} — {q.hint}
+                {formName(q.label)} — {q.hint}
               </div>
             )}
+            {/* 왜 다른 보기는 안 되는지 (모델이 출제하며 스스로 검산한 줄) */}
+            {"why" in q && q.why && <div className="mt-1 text-xs text-sub">💡 {q.why}</div>}
             {/* 지문 속 단어 풀이 + 다른 보기들이 무슨 단어였는지 (전부 탭하면 카드) */}
             <SentenceGlossary q={q} dictionary={bandWords} onShowCard={onShowCard} />
             {q.kind !== "type" && (
@@ -642,11 +656,15 @@ function Prompt({ q }: { q: Question }) {
         </>
       );
     case "conjugate":
+      // 무엇을 하라는 문제인지 한 줄로 못 박는다("조건을(를) 고르세요"로는 안 보인다)
       return (
         <>
-          {label(`${q.label}을(를) 고르세요`)}
+          {label("알맞은 활용형을 고르세요")}
           <div className="mt-2 text-3xl font-bold text-ink">{headword(q.word)}</div>
-          <div className="mt-1 text-sm text-sub">{q.hint}</div>
+          <div className="mt-2 inline-flex flex-wrap items-baseline gap-x-2 rounded-xl bg-pri-soft px-3 py-1.5 text-sm">
+            <b className="text-pri-deep">{formName(q.label)}</b>
+            <span className="text-sub">{q.hint}</span>
+          </div>
         </>
       );
     case "cloze":

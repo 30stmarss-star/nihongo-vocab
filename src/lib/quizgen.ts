@@ -21,12 +21,12 @@ export type Question =
   | { kind: "conjugate"; word: Word; label: string; hint: string; choices: string[]; answer: number }
   /** 뜻 → 독음 타이핑 */
   | { kind: "type"; word: Word }
-  /** 문맥 규정: 빈칸에 알맞은 단어 */
-  | { kind: "cloze"; word: Word; sentence: string; ko: string; choices: string[]; answer: number }
+  /** 문맥 규정: 빈칸에 알맞은 단어 (why = 다른 보기가 안 되는 이유) */
+  | { kind: "cloze"; word: Word; sentence: string; ko: string; choices: string[]; answer: number; why?: string }
   /** 유의 표현: 밑줄 친 말과 가장 가까운 것 */
-  | { kind: "synonym"; word: Word; sentence: string; ko: string; choices: string[]; answer: number }
+  | { kind: "synonym"; word: Word; sentence: string; ko: string; choices: string[]; answer: number; why?: string }
   /** 용법: 이 단어가 올바르게 쓰인 문장 */
-  | { kind: "usage"; word: Word; choices: string[]; answer: number };
+  | { kind: "usage"; word: Word; choices: string[]; answer: number; why?: string };
 
 export function shuffle<T>(a: T[]): T[] {
   const r = [...a];
@@ -35,6 +35,17 @@ export function shuffle<T>(a: T[]): T[] {
     [r[i], r[j]] = [r[j], r[i]];
   }
   return r;
+}
+
+/**
+ * 모델이 만들어 보낸 보기가 문제로 쓸 만한가.
+ * 한 보기만 영어로 오거나(みなと를 "port"로) 같은 보기가 두 번 들어오는 사고를 걸러낸다.
+ */
+export function choicesUsable(choices: unknown): choices is string[] {
+  if (!Array.isArray(choices) || choices.length !== 4) return false;
+  const c = choices.map((x) => String(x ?? "").trim());
+  if (c.some((s) => !s || !/[ぁ-んァ-ヶ一-龯々〆ー]/.test(s) || /[A-Za-z]/.test(s))) return false;
+  return new Set(c).size === 4;
 }
 
 /** 정답을 섞어 넣고 그 위치를 알려준다 */
