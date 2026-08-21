@@ -5,11 +5,18 @@
 //   ※ scan-words 와 마찬가지로 JWT 검증 ON (로그인 사용자만).
 // 비밀키: ANTHROPIC_API_KEY (기존 함수들과 공유).
 //
-// 요청:  POST { action: "read", image: { mediaType, data(base64) }, title?: string }
-// 응답:  { read: { gist, lines[], vocab[], kanji[], sfx[] } }
+// 요청:
+//   POST { action: "read",    image: {mediaType, data}, title? }  → { read }
+//   POST { action: "save",    readId, title, gist, items[] }      → { saved[] }
+//   POST { action: "regroup" }                                    → { groups[] }
 //
-// 저장(단어장 편입)은 이 함수가 하지 않는다 — 기존 scan-words 의 save 액션을 그대로 쓴다.
+// 저장의 원칙: **manga_log 가 진실이고 묶음은 그 위에 얹는 뷰다.**
+// 로그는 공부한 순서 그대로 append 되고 절대 재정렬하지 않는다. regroup 은 그 로그의
+// 구간에 이름을 붙일 뿐이라, 쌓이는 정도에 따라 몇 번이고 다시 엮어도 순서는 남는다.
+//
 // 이미지는 메모리에서만 다루고 어디에도 기록하지 않는다.
+
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 // 만화 판독은 손글씨·효과음·세로쓰기가 섞여 있어 비전 정확도가 결과 품질을 그대로 결정한다.
 const MODEL = "claude-opus-5";
@@ -317,6 +324,304 @@ async function read(apiKey: string, image: ImageIn, title: string) {
   return JSON.parse(out);
 }
 
+// ─────────────────────────── 저장 ───────────────────────────
+
+const admin = () =>
+  createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!);
+
+async function requireUser(req: Request): Promise<string> {
+  const userClient = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SUPABASE_ANON_KEY")!,
+    { global: { headers: { Authorization: req.headers.get("Authorization") ?? "" } } }
+  );
+  const { data } = await userClient.auth.getUser();
+  const uid = data?.user?.id;
+  if (!uid) throw new Error("로그인이 필요합니다");
+  return uid;
+}
+
+const LEVEL_ORDER: Record<string, number> = { N5: 0, N4: 1, N3: 2, N2: 3, N1: 4 };
+
+interface SaveItem extends VocabOut {
+  line_jp?: string;
+  line_ko?: string;
+  line_kana?: string;
+}
+
+/**
+ * 선별 저장. 사용자가 고른 항목만 들어온다(전량 적재 금지).
+ *
+ * 레벨은 **기존 어휘 데이터가 이긴다.** words 는 (kanji, level) 이 유니크라,
+ * LLM 추정 레벨이 기존 것과 다르면 같은 단어가 두 레벨로 중복 삽입된다.
+ * 그래서 이미 있는 표제어면 그 행을 그대로 쓴다 — 중복도 막고 밴드도 안 흔들린다.
+ */
+async function saveItems(
+  req: Request,
+  readId: string,
+  title: string,
+  gist: string,
+  items: SaveItem[]
+) {
+  const uid = await requireUser(req);
+  const db = admin();
+
+  const kanjiList = [...new Set(items.map((w) => w.word))];
+  const { data: existing } = await db
+    .from("words")
+    .select("id,kanji,kana,meaning,level,pos,verb_group,hanja,examples,freq")
+    .in("kanji", kanjiList);
+
+  // 같은 표제어가 여러 레벨에 있으면 쉬운 쪽을 쓴다(클라이언트 cleanWords 와 같은 규칙)
+  const known = new Map<string, (typeof existing)[number]>();
+  for (const r of existing ?? []) {
+    const prev = known.get(r.kanji);
+    if (!prev || LEVEL_ORDER[r.level] < LEVEL_ORDER[prev.level]) known.set(r.kanji, r);
+  }
+
+  const fresh = items.filter((w) => !known.has(w.word));
+  if (fresh.length) {
+    const rows = fresh.map((w) => ({
+      id: `manga-${w.level}-${crypto.randomUUID().slice(0, 8)}`,
+      kanji: w.word,
+      kana: w.reading,
+      meaning: w.ko,
+      level: w.level,
+      pos: w.pos,
+      verb_group: w.pos === "verb" ? (w.verbGroup ?? 1) : null,
+      hanja: w.hanja ?? [],
+      // 예문은 그 단어를 만난 대사 그대로 — 문맥이 곧 기억의 고리다
+      examples: w.line_jp
+        ? [{ jp: w.line_jp, kana: w.line_kana ?? "", ko: w.line_ko ?? "" }]
+        : [],
+      freq: [1, 2, 3].includes(w.freq) ? w.freq : 2,
+      source: "manga",
+    }));
+    const { error } = await db
+      .from("words")
+      .upsert(rows, { onConflict: "kanji,level", ignoreDuplicates: true });
+    if (error) throw error;
+
+    const { data: after } = await db
+      .from("words")
+      .select("id,kanji,kana,meaning,level,pos,verb_group,hanja,examples,freq")
+      .in("kanji", fresh.map((w) => w.word));
+    for (const r of after ?? []) {
+      const prev = known.get(r.kanji);
+      if (!prev || LEVEL_ORDER[r.level] < LEVEL_ORDER[prev.level]) known.set(r.kanji, r);
+    }
+  }
+
+  const saved = items.map((w) => known.get(w.word)).filter(Boolean);
+  if (!saved.length) return { saved: [] };
+
+  // 단어장 + 우선순위 큐 + 순서 로그. 전부 중복 무시(같은 단어를 다시 담아도 순서가 안 흐트러진다).
+  const ids = saved.map((r) => r!.id);
+  await db
+    .from("wordbook")
+    .upsert(ids.map((id) => ({ user_id: uid, word_id: id })), {
+      onConflict: "user_id,word_id",
+      ignoreDuplicates: true,
+    });
+  await db
+    .from("scanned_queue")
+    .upsert(ids.map((id) => ({ user_id: uid, word_id: id })), {
+      onConflict: "user_id,word_id",
+      ignoreDuplicates: true,
+    });
+
+  const logRows = items
+    .map((w, i) => {
+      const row = known.get(w.word);
+      if (!row) return null;
+      return {
+        user_id: uid,
+        word_id: row.id,
+        read_id: readId,
+        title: title || null,
+        gist: gist || null,
+        line_jp: w.line_jp ?? null,
+        line_ko: w.line_ko ?? null,
+        // 같은 판독 안에서도 고른 순서를 지킨다
+        saved_at: new Date(Date.now() + i).toISOString(),
+      };
+    })
+    .filter(Boolean);
+  await db.from("manga_log").upsert(logRows, {
+    onConflict: "user_id,word_id",
+    ignoreDuplicates: true,
+  });
+
+  return { saved };
+}
+
+// ─────────────────────────── 묶음 ───────────────────────────
+
+const NAME_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    groups: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          idx: { type: "integer", description: "입력으로 준 구간의 번호" },
+          name: { type: "string", description: "묶음 이름(한국어, 12자 안팎)" },
+          subtitle: { type: "string", description: "한 줄 설명. 없으면 빈 문자열." },
+          kind: {
+            type: "string",
+            enum: ["scene", "flow", "theme", "day"],
+            description: "이 구간을 무엇으로 묶었는지",
+          },
+        },
+        required: ["idx", "name", "subtitle", "kind"],
+      },
+    },
+  },
+  required: ["groups"],
+};
+
+const NAME_PROMPT = `아래는 한 학습자가 일본 만화를 읽다가 막혀서 담아 둔 단어들입니다.
+담은 순서대로 구간이 나뉘어 있고, 각 구간에는 그때 읽던 페이지의 요약과 대사, 담은 단어가 들어 있습니다.
+
+각 구간에 **단어장에서 볼 이름**을 붙여 주세요.
+
+- 이름은 대사와 요약을 보고 **그 장면이 떠오르게** 짓습니다. "N3 단어 12개" 같은 건 쓸모없습니다.
+  좋은 예: "돌아가려는 걸 붙잡다", "체육관 대치", "첫 시합 전날 밤"
+- 한국어로 12자 안팎. 작품명은 이미 따로 보이니 이름에 넣지 마세요.
+- subtitle 은 한 줄 설명. 붙일 말이 없으면 빈 문자열로 두세요.
+- kind 는 그 구간을 무엇으로 묶은 것인지:
+  - scene : 한 장면·한 대목 (기본값. 대사가 하나의 상황으로 이어질 때)
+  - flow  : 여러 장면이 이어진 흐름 (구간이 길거나 이야기가 진행될 때)
+  - theme : 장면보다 주제로 묶는 게 나을 때 (감정 표현·존댓말·욕설 등)
+  - day   : 뚜렷한 장면도 주제도 없어 "언제 공부했나"로 묶는 게 나을 때
+- **앞선 묶음 이름들이 같이 주어지면 그 흐름을 이어 주세요.** 같은 장면이 계속되면
+  "체육관 대치 ②" 처럼 잇고, 새 국면이면 새 이름을 붙입니다. 앞 이름을 그대로 반복하지는 마세요.
+- 담긴 양이 적으면 잘게(scene), 많이 쌓였으면 크게(flow/theme) 묶는 쪽이 읽기 좋습니다.`;
+
+interface LogRow {
+  id: number;
+  word_id: string;
+  read_id: string;
+  title: string | null;
+  gist: string | null;
+  line_jp: string | null;
+  saved_at: string;
+}
+
+/** 로그를 구간으로 자른다 — 작품이 바뀌거나, 45분 넘게 끊기거나, 너무 커지면 자른다. */
+function cutRuns(rows: LogRow[]): LogRow[][] {
+  const GAP_MS = 45 * 60 * 1000;
+  const MAX = 14;
+  const runs: LogRow[][] = [];
+  for (const r of rows) {
+    const cur = runs[runs.length - 1];
+    const prev = cur?.[cur.length - 1];
+    const cut =
+      !cur ||
+      cur.length >= MAX ||
+      (prev?.title ?? "") !== (r.title ?? "") ||
+      new Date(r.saved_at).getTime() - new Date(prev!.saved_at).getTime() > GAP_MS;
+    if (cut) runs.push([r]);
+    else cur.push(r);
+  }
+  return runs;
+}
+
+async function regroup(req: Request, apiKey: string) {
+  const uid = await requireUser(req);
+  const db = admin();
+
+  const { data: rows } = await db
+    .from("manga_log")
+    .select("id,word_id,read_id,title,gist,line_jp,saved_at")
+    .eq("user_id", uid)
+    .order("id", { ascending: true });
+  const log = (rows ?? []) as LogRow[];
+  if (!log.length) return { groups: [] };
+
+  const { data: existing } = await db
+    .from("manga_group")
+    .select("id,name,from_id,to_id")
+    .eq("user_id", uid)
+    .order("from_id", { ascending: true });
+
+  // 이미 이름이 붙은 구간은 건드리지 않는다 — 다시 부르는 비용도, 이름이 바뀌는 혼란도 없다.
+  const covered = Math.max(0, ...(existing ?? []).map((g) => g.to_id));
+  const pending = cutRuns(log.filter((r) => r.id > covered));
+  if (!pending.length) return { groups: existing ?? [] };
+
+  const payload = pending.map((run, idx) => ({
+    idx,
+    title: run[0].title ?? "",
+    count: run.length,
+    gists: [...new Set(run.map((r) => r.gist).filter(Boolean))].slice(0, 4),
+    lines: [...new Set(run.map((r) => r.line_jp).filter(Boolean))].slice(0, 8),
+  }));
+  const prevNames = (existing ?? []).slice(-5).map((g) => g.name);
+
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: MODEL,
+      max_tokens: 4000,
+      // 이름 짓기는 판독보다 가벼운 일이다.
+      output_config: { effort: "low", format: { type: "json_schema", schema: NAME_SCHEMA } },
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "text",
+              text:
+                NAME_PROMPT +
+                (prevNames.length ? `\n\n앞선 묶음 이름들: ${prevNames.join(" / ")}` : "") +
+                `\n\n지금까지 담은 단어 총 ${log.length}개.\n\n` +
+                JSON.stringify(payload, null, 2),
+            },
+          ],
+        },
+      ],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  const text = (data.content ?? []).find((b: { type: string }) => b.type === "text")?.text;
+  const named: { idx: number; name: string; subtitle: string; kind: string }[] = text
+    ? (JSON.parse(text).groups ?? [])
+    : [];
+
+  const byIdx = new Map(named.map((g) => [g.idx, g]));
+  const inserts = pending.map((run, idx) => {
+    const g = byIdx.get(idx);
+    return {
+      user_id: uid,
+      // 이름 짓기가 실패해도 묶음은 남긴다 — 순서가 끊기는 것보다 낫다
+      name: g?.name?.trim() || (run[0].title ? `${run[0].title}에서` : "읽은 자리"),
+      subtitle: g?.subtitle?.trim() || null,
+      kind: ["scene", "flow", "theme", "day"].includes(g?.kind ?? "") ? g!.kind : "scene",
+      from_id: run[0].id,
+      to_id: run[run.length - 1].id,
+    };
+  });
+  const { error } = await db.from("manga_group").insert(inserts);
+  if (error) throw error;
+
+  const { data: all } = await db
+    .from("manga_group")
+    .select("id,name,subtitle,kind,from_id,to_id")
+    .eq("user_id", uid)
+    .order("from_id", { ascending: true });
+  return { groups: all ?? [] };
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS });
 
@@ -325,7 +630,37 @@ Deno.serve(async (req) => {
     if (!apiKey) return json({ error: "ANTHROPIC_API_KEY 미설정" }, 500);
 
     const body = await req.json().catch(() => ({}));
-    if (body?.action !== "read") return json({ error: 'action 은 "read" 여야 합니다' }, 400);
+
+    if (body?.action === "save") {
+      // 클라이언트가 보낸 값이라 다시 검증한다 — words 는 모든 사용자가 함께 쓰는 테이블이다.
+      const items = (Array.isArray(body.items) ? body.items : ([] as SaveItem[])).filter(
+        (w: SaveItem) =>
+          w &&
+          typeof w.word === "string" &&
+          (JP.test(w.word) || KANA.test(w.word)) &&
+          !LATIN.test(w.word) &&
+          KANA.test(w.reading ?? "") &&
+          HANGUL.test(w.ko ?? "") &&
+          POS.includes(w.pos) &&
+          LEVELS.includes(w.level)
+      ) as SaveItem[];
+      if (!items.length) return json({ error: "저장할 단어가 없습니다" }, 400);
+      return json(
+        await saveItems(
+          req,
+          typeof body.readId === "string" ? body.readId : crypto.randomUUID(),
+          typeof body.title === "string" ? body.title.trim() : "",
+          typeof body.gist === "string" ? body.gist : "",
+          items
+        )
+      );
+    }
+
+    if (body?.action === "regroup") return json(await regroup(req, apiKey));
+
+    if (body?.action !== "read") {
+      return json({ error: 'action 은 read | save | regroup 이어야 합니다' }, 400);
+    }
 
     const image = body.image as ImageIn | undefined;
     if (!image?.data || !image?.mediaType) return json({ error: "image 가 필요합니다" }, 400);

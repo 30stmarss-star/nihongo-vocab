@@ -160,14 +160,19 @@ export async function fileToMangaImage(file: File): Promise<MangaImage> {
   throw new Error("이미지가 너무 큽니다. 페이지 일부만 잘라서 다시 시도해 주세요.");
 }
 
-/** Edge Function 호출 (에러 본문의 메시지를 최대한 살려서 던진다) */
-export async function readManga(image: MangaImage, title?: string): Promise<MangaReadResult> {
+/** 만화에서 담은 단어의 묶음 (manga_log 의 구간을 가리킨다) */
+export interface MangaGroup {
+  id: string;
+  name: string;
+  subtitle: string | null;
+  kind: "scene" | "flow" | "theme" | "day";
+  from_id: number;
+  to_id: number;
+}
+
+async function call<T>(body: Record<string, unknown>): Promise<T> {
   if (!(CLOUD && supabase)) throw new Error("클라우드 모드에서만 사용할 수 있어요.");
-
-  const { data, error } = await supabase.functions.invoke("read-manga", {
-    body: { action: "read", image, title: title ?? "" },
-  });
-
+  const { data, error } = await supabase.functions.invoke("read-manga", { body });
   if (error) {
     let msg = error.message;
     try {
@@ -182,8 +187,18 @@ export async function readManga(image: MangaImage, title?: string): Promise<Mang
     throw new Error(msg);
   }
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
+  return data as T;
+}
 
-  const read = (data as { read?: Partial<MangaReadResult> })?.read;
+/** 페이지 판독 */
+export async function readManga(image: MangaImage, title?: string): Promise<MangaReadResult> {
+  const data = await call<{ read?: Partial<MangaReadResult> }>({
+    action: "read",
+    image,
+    title: title ?? "",
+  });
+
+  const read = data?.read;
   if (!read) throw new Error("판독 결과가 비어 있어요. 다시 시도해 주세요.");
 
   // 배포 시차로 옛 함수가 응답할 수 있다(필드가 통째로 없음). 빈 배열로 메워 화면이 죽지 않게.
@@ -196,4 +211,89 @@ export async function readManga(image: MangaImage, title?: string): Promise<Mang
     kanji: arr<MangaKanji>(read.kanji).map((k) => ({ ...k, line_index: k.line_index ?? -1 })),
     sfx: arr<MangaSfx>(read.sfx),
   };
+}
+
+/** 저장 요청 한 건 — 어휘 + 그 단어를 만난 대사 */
+export interface MangaSaveItem extends MangaVocab {
+  line_jp: string;
+  line_kana: string;
+  line_ko: string;
+}
+
+/** DB 행 (store.rowToWord 로 앱 타입으로 바꾼다) */
+export interface MangaSavedRow {
+  id: string;
+  kanji: string;
+  kana: string;
+  meaning: string;
+  level: Level;
+  pos: WordType["kind"];
+  verb_group: number | null;
+  hanja: { char: string; reading: string }[];
+  examples: { jp: string; kana: string; ko: string }[];
+  freq: number | null;
+}
+
+/**
+ * 고른 어휘만 단어장에 담는다. 서버가 순서 로그(manga_log)에도 같이 쌓는다.
+ * 레벨은 기존 어휘 데이터가 이긴다 — 같은 단어가 두 레벨로 갈라지는 걸 막는다.
+ */
+export async function saveMangaVocab(
+  readId: string,
+  title: string,
+  gist: string,
+  items: MangaSaveItem[]
+): Promise<MangaSavedRow[]> {
+  const { saved } = await call<{ saved: MangaSavedRow[] }>({
+    action: "save",
+    readId,
+    title,
+    gist,
+    items,
+  });
+  return saved ?? [];
+}
+
+/**
+ * 아직 이름이 없는 구간에 이름을 붙인다. 이미 붙은 묶음은 건드리지 않는다.
+ * 담을 때마다 부르지 말고 페이지를 한 번 마칠 때 부르는 게 맞다(호출 비용).
+ */
+export async function regroupManga(): Promise<MangaGroup[]> {
+  const { groups } = await call<{ groups: MangaGroup[] }>({ action: "regroup" });
+  return groups ?? [];
+}
+
+/** 단어장에서 쓸 만화 묶음 + 공부한 순서 */
+export interface MangaBook {
+  groups: MangaGroup[];
+  /** word_id → manga_log.id. 이 값이 "내가 공부한 순서"이자 묶음 구간의 좌표다. */
+  order: Map<string, number>;
+}
+
+const EMPTY_BOOK: MangaBook = { groups: [], order: new Map() };
+
+/**
+ * 로그와 묶음을 함께 읽어온다.
+ * 로그가 진실이므로 묶음이 아직 없어도 순서는 살아 있다 — 그 경우 "아직 안 엮인" 칸에 모인다.
+ */
+export async function loadMangaBook(userId: string | null): Promise<MangaBook> {
+  if (!(CLOUD && supabase && userId)) return EMPTY_BOOK;
+  try {
+    const [log, groups] = await Promise.all([
+      supabase.from("manga_log").select("id,word_id").order("id", { ascending: true }),
+      supabase
+        .from("manga_group")
+        .select("id,name,subtitle,kind,from_id,to_id")
+        .order("from_id", { ascending: true }),
+    ]);
+    if (log.error || groups.error) throw log.error ?? groups.error;
+    return {
+      groups: (groups.data ?? []) as MangaGroup[],
+      order: new Map((log.data ?? []).map((r) => [r.word_id as string, r.id as number])),
+    };
+  } catch (e) {
+    // 테이블이 아직 없거나 네트워크가 죽어도 단어장 자체는 떠야 한다
+    console.warn("[manga] 묶음 불러오기 실패:", e instanceof Error ? e.message : e);
+    return EMPTY_BOOK;
+  }
 }
