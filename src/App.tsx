@@ -55,6 +55,7 @@ import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { MangaRead } from "./components/MangaRead";
+import { Landing, type Mode } from "./components/Landing";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
 import { Home } from "./components/Home";
@@ -74,7 +75,6 @@ type View =
   | "wordbook"
   | "speaklog"
   | "scan"
-  | "manga"
   | "kanji"
   | "tutor"
   | "quiz"
@@ -100,6 +100,9 @@ export default function App() {
   const [progress, setProgress] = useState<ProgressMap>({});
   const [band, setBand] = useState<Band | null>(null);
   const [view, setView] = useState<View>("home");
+  // 앱을 열면 항상 랜딩(모드 선택)부터. 하루 코스와 만화 읽기는 별개의 앱처럼 다룬다.
+  // view="home" 의 의미가 모드마다 다르다 — 코스면 오늘의 코스, 만화면 판독 화면.
+  const [mode, setMode] = useState<Mode>("pick");
   const [menuOpen, setMenuOpen] = useState(false);
   const [updating, setUpdating] = useState(false);
   const [plan, setPlan] = useState<DailyPlan | null>(null);
@@ -656,36 +659,69 @@ export default function App() {
         focusMode ? "pb-6" : "pb-[calc(6.5rem_+_env(safe-area-inset-bottom))]",
       ].join(" ")}
     >
-      <header className="mb-4 flex items-center gap-3">
+      <header className="mb-4 flex items-center gap-2.5">
+        {/* 모드 안에서만 나오는 나가기 — 여기서 랜딩(모드 선택)으로 돌아간다 */}
+        {mode !== "pick" && view === "home" && (
+          <button
+            onClick={() => setMode("pick")}
+            aria-label="모드 선택으로 돌아가기"
+            className="-ml-1.5 shrink-0 rounded-lg px-1.5 py-1 text-lg leading-none text-mut transition hover:text-ink"
+          >
+            ←
+          </button>
+        )}
         <h1 className="text-lg font-extrabold text-ink">
           {view === "wordbook"
             ? "단어장 📚"
             : view === "speaklog"
               ? "작문 기록 💬"
-              : view === "manga"
+              : mode === "manga"
                 ? "만화 판독 📖"
-                : "일본어 하루 코스"}
+                : mode === "course"
+                  ? "일본어 하루 코스"
+                  : "일본어"}
         </h1>
-        <select
-          value={band}
-          onChange={(e) => chooseBand(e.target.value as Band)}
-          className="rounded-xl bg-card px-2.5 py-1.5 text-sm font-semibold text-sub shadow-soft"
-        >
-          {BANDS.map((b) => (
-            <option key={b.id} value={b.id}>
-              {b.label}
-            </option>
-          ))}
-        </select>
+        {/* 난이도는 하루 코스에만 걸리는 설정이라 그 모드에서만 보여준다 */}
+        {mode === "course" && (
+          <select
+            value={band}
+            onChange={(e) => chooseBand(e.target.value as Band)}
+            className="rounded-xl bg-card px-2.5 py-1.5 text-sm font-semibold text-sub shadow-soft"
+          >
+            {BANDS.map((b) => (
+              <option key={b.id} value={b.id}>
+                {b.label}
+              </option>
+            ))}
+          </select>
+        )}
       </header>
 
-      {(view === "kanji" || view === "tutor" || view === "quiz" || view === "reference" || view === "speaklog") && (
+      {(view === "kanji" ||
+        view === "tutor" ||
+        view === "quiz" ||
+        view === "reference" ||
+        view === "speaklog" ||
+        // 랜딩 모드에는 하단 네비에 홈 버튼이 없다 — 단어장에서 돌아올 길을 열어둔다
+        (mode === "pick" && view === "wordbook")) && (
         <button onClick={() => setView("home")} className="mb-3 -mt-1 text-sm font-semibold text-sub transition hover:text-ink">
           ← 홈으로
         </button>
       )}
 
-      {view === "home" ? (
+      {view === "home" && mode === "pick" ? (
+        <Landing
+          plan={plan}
+          streak={streak}
+          bandLabel={BANDS.find((b) => b.id === band)?.label ?? band}
+          onPick={(m) => {
+            setMode(m);
+            setView("home");
+          }}
+        />
+      ) : view === "home" && mode === "manga" ? (
+        <MangaRead />
+      ) : view === "home" ? (
         <Home
           plan={plan}
           scenario={plan.speakScenario ?? null}
@@ -759,8 +795,6 @@ export default function App() {
         />
       ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
-      ) : view === "manga" ? (
-        <MangaRead />
       ) : view === "tutor" ? (
         <Chat />
       ) : view === "quiz" ? (
@@ -781,16 +815,30 @@ export default function App() {
 
       {/* 하단 네비 */}
       <nav className="fixed inset-x-0 bottom-0 z-30 border-t border-line bg-card/95 pb-[env(safe-area-inset-bottom)] backdrop-blur">
+        {/* 네비는 모드마다 다르다 — 만화를 읽는 중에 코스 메뉴가 보일 이유가 없다.
+            단어장만 두 모드가 공유한다(어디서 주웠든 내 단어는 한 곳에 쌓인다). */}
         <div className="mx-auto flex max-w-2xl items-stretch justify-around px-2">
-          <NavBtn label="홈" icon="🏠" active={view === "home"} onClick={() => go("home")} />
-          <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
-          {CLOUD && userId && (
-            <NavBtn label="촬영" icon="📷" active={view === "scan"} onClick={() => go("scan")} />
+          {mode === "manga" ? (
+            <>
+              <NavBtn label="읽기" icon="📖" active={view === "home"} onClick={() => go("home")} />
+              <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
+              <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
+            </>
+          ) : mode === "course" ? (
+            <>
+              <NavBtn label="홈" icon="🏠" active={view === "home"} onClick={() => go("home")} />
+              <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
+              {CLOUD && userId && (
+                <NavBtn label="촬영" icon="📷" active={view === "scan"} onClick={() => go("scan")} />
+              )}
+              <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
+            </>
+          ) : (
+            <>
+              <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
+              <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
+            </>
           )}
-          {CLOUD && userId && (
-            <NavBtn label="만화" icon="📖" active={view === "manga"} onClick={() => go("manga")} />
-          )}
-          <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
         </div>
       </nav>
 
