@@ -54,6 +54,7 @@ import { Login } from "./components/Login";
 import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
+import { MangaRead } from "./components/MangaRead";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
 import { Home } from "./components/Home";
@@ -73,6 +74,7 @@ type View =
   | "wordbook"
   | "speaklog"
   | "scan"
+  | "manga"
   | "kanji"
   | "tutor"
   | "quiz"
@@ -105,6 +107,9 @@ export default function App() {
   // 단어장 방향: false=일본어 보기(뜻 가림), true=뜻 보기(단어 가림)
   const [bookReverse, setBookReverse] = useState(false);
   const [scanned, setScanned] = useState<Set<string>>(new Set());
+  // 코스를 짤 때(ensurePlan/newCycle) 최신 값을 동기적으로 봐야 해서 ref 로도 들고 있는다.
+  // 상태만 쓰면 init 안에서 setScanned 직후의 ensurePlan 이 옛 값을 본다.
+  const scannedRef = useRef<Set<string>>(new Set());
   // 단어장: 하루 코스를 마친 단어 + 촬영 단어 (id → 담은 날짜)
   const [wordbook, setWordbook] = useState<Wordbook>(new Map());
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
@@ -158,6 +163,7 @@ export default function App() {
     // 2) 서버에서 최신 데이터를 받아 백그라운드로 반영한다.
     const [s, scannedSet] = await Promise.all([loadSession(uid), loadScannedQueue(uid)]);
     setWords(s.words);
+    scannedRef.current = scannedSet;
     setScanned(scannedSet);
     setProgress(s.progress);
     if (s.band) {
@@ -218,7 +224,7 @@ export default function App() {
     if (valid) return existing!;
     // 갓 만든 빈 코스는 서버에 올리지 않는다 — 다른 기기에서 하던 진행을 덮어쓰게 된다.
     // 서버 반영은 실제로 진행을 건드릴 때(updatePlan) 일어난다.
-    const fresh = buildDailyPlan(poolFor(b, list), prog, b);
+    const fresh = buildDailyPlan(poolFor(b, list), prog, b, Date.now(), scannedRef.current);
     savePlanLocal(uid, fresh);
     return fresh;
   }
@@ -234,7 +240,7 @@ export default function App() {
 
   function newCycle() {
     if (!band) return;
-    const fresh = buildDailyPlan(poolFor(band), progress, band);
+    const fresh = buildDailyPlan(poolFor(band), progress, band, Date.now(), scannedRef.current);
     savePlan(userId, fresh);
     setPlan(fresh);
   }
@@ -253,6 +259,7 @@ export default function App() {
     setWords([...byId.values()]);
     const nextScanned = new Set(scanned);
     for (const w of saved) nextScanned.add(w.id);
+    scannedRef.current = nextScanned;
     setScanned(nextScanned);
     // 촬영한 단어는 단어장에도 바로 넣는다
     setWordbook((prev) => addToWordbook(userId, saved.map((w) => w.id), prev));
@@ -651,7 +658,13 @@ export default function App() {
     >
       <header className="mb-4 flex items-center gap-3">
         <h1 className="text-lg font-extrabold text-ink">
-          {view === "wordbook" ? "단어장 📚" : view === "speaklog" ? "작문 기록 💬" : "일본어 하루 코스"}
+          {view === "wordbook"
+            ? "단어장 📚"
+            : view === "speaklog"
+              ? "작문 기록 💬"
+              : view === "manga"
+                ? "만화 판독 📖"
+                : "일본어 하루 코스"}
         </h1>
         <select
           value={band}
@@ -746,6 +759,8 @@ export default function App() {
         />
       ) : view === "scan" ? (
         <ScanCapture onSaved={onScanSaved} />
+      ) : view === "manga" ? (
+        <MangaRead />
       ) : view === "tutor" ? (
         <Chat />
       ) : view === "quiz" ? (
@@ -771,6 +786,9 @@ export default function App() {
           <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
           {CLOUD && userId && (
             <NavBtn label="촬영" icon="📷" active={view === "scan"} onClick={() => go("scan")} />
+          )}
+          {CLOUD && userId && (
+            <NavBtn label="만화" icon="📖" active={view === "manga"} onClick={() => go("manga")} />
           )}
           <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
         </div>

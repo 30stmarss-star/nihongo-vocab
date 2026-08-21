@@ -133,11 +133,19 @@ export function isPlanUntouched(p: DailyPlan): boolean {
 }
 
 /** 새 사이클 구성: 새 단어 NEW_PER_DAY + 복습 만기분(오래 밀린 순) REVIEW_CAP */
+/**
+ * 하루 코스 하나를 짠다.
+ *
+ * `priority` 는 "내가 직접 넣은 단어"(촬영·만화 판독)의 id 집합. 새 단어 칸에서
+ * 맨 앞을 차지한다 — 내가 실제로 막혔던 단어부터 나와야 넣은 보람이 있다.
+ * 아직 한 번도 안 본 단어에만 적용되므로, 외우고 나면 자동으로 빠진다.
+ */
 export function buildDailyPlan(
   pool: Word[],
   progress: ProgressMap,
   band: Band,
-  now: number = Date.now()
+  now: number = Date.now(),
+  priority: ReadonlySet<string> = new Set()
 ): DailyPlan {
   const day = dayKey(now);
 
@@ -163,8 +171,11 @@ export function buildDailyPlan(
     return !p || p.seenCount === 0;
   });
   const jitter = new Map(fresh.map((w) => [w.id, Math.random()]));
+  // 내가 넣은 단어 먼저 → 중요도 → 약간 섞기
+  const mine = (w: Word) => (priority.has(w.id) ? 0 : 1);
   fresh.sort(
     (a, b) =>
+      mine(a) - mine(b) ||
       (a.freq ?? 2) - (b.freq ?? 2) ||
       (jitter.get(a.id) ?? 0) - (jitter.get(b.id) ?? 0)
   );
