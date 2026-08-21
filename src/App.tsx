@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { BANDS, typeLabel, type Band, type Word } from "./data/types";
 import {
   applyRating,
@@ -57,6 +57,7 @@ import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { MangaRead } from "./components/MangaRead";
 import { loadMangaBook, type MangaBook } from "./lib/manga";
+import { flushMangaGroups, getMangaState, subscribeManga } from "./lib/mangaSession";
 import { Landing, type Mode } from "./components/Landing";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
@@ -122,6 +123,11 @@ export default function App() {
   // 단어장 보기: 만화 묶음별(공부한 순서) ↔ 난이도별
   const [bookByGroup, setBookByGroup] = useState(true);
   const [mangaBook, setMangaBook] = useState<MangaBook>({ groups: [], order: new Map() });
+  // 판독은 화면 밖에서 계속 돈다. 단어장에 가 있어도 진행 중이라는 걸 보여준다.
+  const mangaReading = useSyncExternalStore(
+    subscribeManga,
+    () => getMangaState().stage === "reading"
+  );
   const [scanned, setScanned] = useState<Set<string>>(new Set());
   // 코스를 짤 때(ensurePlan/newCycle) 최신 값을 동기적으로 봐야 해서 ref 로도 들고 있는다.
   // 상태만 쓰면 init 안에서 setScanned 직후의 ensurePlan 이 옛 값을 본다.
@@ -374,7 +380,7 @@ export default function App() {
     const wasBook = prevViewRef.current === "wordbook";
     prevViewRef.current = view;
     if (view !== "wordbook") return;
-    void loadMangaBook(userId).then(setMangaBook);
+    void flushMangaGroups().then(() => loadMangaBook(userId).then(setMangaBook));
 
     const rankOf = (list: Word[], base: Map<string, 0 | 1 | 2>) => {
       const m = new Map(base);
@@ -941,7 +947,13 @@ export default function App() {
         <div className="mx-auto flex max-w-2xl items-stretch justify-around px-2">
           {mode === "manga" ? (
             <>
-              <NavBtn label="읽기" icon="📖" active={view === "home"} onClick={() => go("home")} />
+              <NavBtn
+                label="읽기"
+                icon="📖"
+                active={view === "home"}
+                busy={mangaReading}
+                onClick={() => go("home")}
+              />
               <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
               <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
             </>
@@ -1047,11 +1059,14 @@ function NavBtn({
   label,
   icon,
   active,
+  busy,
   onClick,
 }: {
   label: string;
   icon: string;
   active: boolean;
+  /** 이 탭에서 뭔가 돌아가는 중 — 다른 탭에 있어도 보이게 */
+  busy?: boolean;
   onClick: () => void;
 }) {
   return (
@@ -1062,8 +1077,13 @@ function NavBtn({
         active ? "text-pri-deep" : "text-mut hover:text-sub",
       ].join(" ")}
     >
-      <span className={["text-xl transition", active ? "scale-110" : ""].join(" ")}>{icon}</span>
-      {label}
+      <span className="relative">
+        <span className={["text-xl transition", active ? "scale-110" : ""].join(" ")}>{icon}</span>
+        {busy && (
+          <span className="absolute -right-1.5 -top-0.5 h-2 w-2 animate-pulse rounded-full bg-pri ring-2 ring-card" />
+        )}
+      </span>
+      {busy ? "읽는 중" : label}
     </button>
   );
 }

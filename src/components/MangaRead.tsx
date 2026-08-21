@@ -1,16 +1,18 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
-  fileToMangaImage,
   isSupportedImage,
-  readManga,
-  regroupManga,
-  saveMangaVocab,
   type MangaGrammar,
   type MangaKanji,
-  type MangaReadResult,
   type MangaSavedRow,
   type MangaVocab,
 } from "../lib/manga";
+import {
+  getMangaState,
+  keepMangaVocab,
+  setMangaTitle,
+  startMangaRead,
+  subscribeManga,
+} from "../lib/mangaSession";
 
 /**
  * 만화 판독 화면.
@@ -23,10 +25,13 @@ import {
  * 스크롤할 때마다 그림이 사라지면 어느 말풍선 얘기인지 놓친다.
  *
  * 다음 페이지 입력은 결과 맨 아래에 상주한다. 읽던 흐름이 끊기지 않게.
- * 이미지는 판독하는 동안만 메모리에 있고, 화면을 떠나면 사라진다. 저장하지 않는다.
+ *
+ * 판독 상태는 이 컴포넌트가 아니라 mangaSession 이 들고 있다. 판독은 10초쯤 걸리는데
+ * 그 사이 단어장을 보러 갔다 오면 여기가 언마운트되면서 진행 중인 판독이 날아가기 때문이다.
+ * 여기는 구독해서 그리기만 한다.
+ *
+ * 이미지는 메모리에만 있다. 디스크에 쓰지 않는다.
  */
-
-type Stage = "pick" | "reading" | "done";
 
 const LEVEL_TONE: Record<string, string> = {
   N5: "bg-mint-soft text-mint",
@@ -37,87 +42,24 @@ const LEVEL_TONE: Record<string, string> = {
 };
 
 export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => void }) {
-  const [stage, setStage] = useState<Stage>("pick");
-  const [title, setTitle] = useState("");
-  const [preview, setPreview] = useState<string | null>(null);
-  const [result, setResult] = useState<MangaReadResult | null>(null);
-  const [err, setErr] = useState<string | null>(null);
+  // 판독 상태는 화면 밖(mangaSession)에 있다 — 여기를 떠났다 와도 이어진다
+  const { stage, title, preview, result, err, kept, keeping } = useSyncExternalStore(
+    subscribeManga,
+    getMangaState
+  );
   const [dragging, setDragging] = useState(false);
   const [imgOpen, setImgOpen] = useState(true);
-  // 담긴 표제어 / 담는 중인 표제어
-  const [kept, setKept] = useState<Set<string>>(new Set());
-  const [keeping, setKeeping] = useState<Set<string>>(new Set());
   const fileRef = useRef<HTMLInputElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
-  const busy = useRef(false);
-  const readId = useRef<string>(crypto.randomUUID());
-  // 담은 게 있는데 아직 묶음 이름을 안 붙였다 — 페이지를 마칠 때 한 번만 부른다
-  const needsRegroup = useRef(false);
 
-  /** 묶음 이름 붙이기. LLM 호출이라 담을 때마다가 아니라 페이지를 마칠 때 부른다. */
-  const flushGroups = () => {
-    if (!needsRegroup.current) return;
-    needsRegroup.current = false;
-    void regroupManga().catch((e) => console.warn("[manga] 묶음 실패:", e));
-  };
-
-  const start = async (file: File) => {
-    if (busy.current) return;
-    // 이미지가 아니면 조용히 무시한다 — 다른 걸 복사하다 잘못 눌리는 경우가 잦다.
+  const start = (file: File) => {
     if (!isSupportedImage(file)) return;
-
-    flushGroups(); // 앞 페이지에서 담은 것들을 여기서 한 묶음으로 마무리한다
-    busy.current = true;
-    setErr(null);
-    setResult(null);
-    setKept(new Set());
     setImgOpen(true);
-    readId.current = crypto.randomUUID();
-    if (preview) URL.revokeObjectURL(preview);
-    setPreview(URL.createObjectURL(file));
-    setStage("reading");
     topRef.current?.scrollIntoView({ block: "start" });
-    try {
-      const image = await fileToMangaImage(file);
-      const read = await readManga(image, title);
-      setResult(read);
-      setStage("done");
-      topRef.current?.scrollIntoView({ block: "start" });
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "판독 중 오류가 났어요.");
-      setStage("pick");
-    } finally {
-      busy.current = false;
-    }
+    void startMangaRead(file);
   };
 
-  /** 고른 어휘만 담는다. 기본값은 담지 않음 — 페이지를 넣었다고 자동으로 들어가지 않는다. */
-  const keep = async (list: MangaVocab[]) => {
-    if (!result) return;
-    const todo = list.filter((v) => !kept.has(v.word) && !keeping.has(v.word));
-    if (!todo.length) return;
-
-    setKeeping((s) => new Set([...s, ...todo.map((v) => v.word)]));
-    setErr(null);
-    try {
-      const items = todo.map((v) => {
-        const l = v.line_index >= 0 ? result.lines[v.line_index] : undefined;
-        return { ...v, line_jp: l?.jp ?? "", line_kana: l?.kana ?? "", line_ko: l?.ko ?? "" };
-      });
-      const rows = await saveMangaVocab(readId.current, title, result.gist, items);
-      onSaved(rows);
-      needsRegroup.current = true;
-      setKept((s) => new Set([...s, ...todo.map((v) => v.word)]));
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : "담는 중 오류가 났어요.");
-    } finally {
-      setKeeping((s) => {
-        const n = new Set(s);
-        for (const v of todo) n.delete(v.word);
-        return n;
-      });
-    }
-  };
+  const keep = (list: MangaVocab[]) => void keepMangaVocab(list, onSaved);
 
   // 붙여넣기는 window 에서 받는다 — 결과를 읽는 중에도 바로 다음 장을 넣을 수 있게.
   useEffect(() => {
@@ -129,7 +71,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
         const file = item.getAsFile();
         if (file && isSupportedImage(file)) {
           e.preventDefault();
-          void start(file);
+          start(file);
           return;
         }
       }
@@ -137,16 +79,12 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
     window.addEventListener("paste", onPaste);
     return () => window.removeEventListener("paste", onPaste);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [title, preview]);
+  }, []);
 
+  // 판독이 끝나 있으면 맨 위부터 보게 한다(다른 화면 갔다 돌아온 경우)
   useEffect(() => {
-    return () => {
-      if (preview) URL.revokeObjectURL(preview);
-    };
-  }, [preview]);
-
-  // 화면을 떠날 때도 담은 것들을 한 묶음으로 마무리한다
-  useEffect(() => flushGroups, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (stage === "done") topRef.current?.scrollIntoView({ block: "start" });
+  }, [stage]);
 
   const dropProps = {
     onDragOver: (e: React.DragEvent) => {
@@ -158,7 +96,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
       e.preventDefault();
       setDragging(false);
       const f = e.dataTransfer.files?.[0];
-      if (f) void start(f);
+      if (f) start(f);
     },
   };
 
@@ -177,7 +115,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
         className="hidden"
         onChange={(e) => {
           const f = e.target.files?.[0];
-          if (f) void start(f);
+          if (f) start(f);
           e.target.value = "";
         }}
       />
@@ -188,7 +126,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
           <span className="mb-1 block text-[10px] font-bold text-mut">지금 읽는 작품</span>
           <input
             value={title}
-            onChange={(e) => setTitle(e.target.value)}
+            onChange={(e) => setMangaTitle(e.target.value)}
             placeholder="예: 하이큐!! 3권"
             className="w-full rounded-lg border border-line bg-card px-2 py-1.5 text-sm text-ink outline-none focus:border-pri"
           />
@@ -290,7 +228,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
                         v={w}
                         kept={kept.has(w.word)}
                         busy={keeping.has(w.word)}
-                        onKeep={() => void keep([w])}
+                        onKeep={() => keep([w])}
                       />
                     ))}
                   </Section>
@@ -328,7 +266,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
                       v={w}
                       kept={kept.has(w.word)}
                       busy={keeping.has(w.word)}
-                      onKeep={() => void keep([w])}
+                      onKeep={() => keep([w])}
                     />
                   ))}
                 </Section>
@@ -359,7 +297,7 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
                 담김
               </span>
               <button
-                onClick={() => void keep(result.vocab)}
+                onClick={() => keep(result.vocab)}
                 disabled={result.vocab.every((v) => kept.has(v.word)) || keeping.size > 0}
                 className="ml-auto shrink-0 rounded-xl bg-pri px-3.5 py-1.5 text-xs font-bold text-white transition hover:bg-pri-deep disabled:bg-page disabled:text-mut"
               >
