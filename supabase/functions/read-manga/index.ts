@@ -26,6 +26,10 @@ const MODEL = "claude-opus-5";
 //  - "high" : 격투 장면처럼 손글씨가 많은 페이지에서 더 안정적. 느리다.
 // 9장 검증(실제 10장)에서 순서 오류·지어냄이 나오면 여기를 먼저 올린다.
 const EFFORT = "medium";
+// 패스트 모드: 같은 모델·같은 품질로 출력 속도가 최대 2.5배. 대신 토큰 단가가 2배다
+// ($5/$25 → $10/$50). 장당 비용이 원래 30원대라 두 배여도 부담이 크지 않다.
+// Claude API 전용(리서치 프리뷰)이고 레이트리밋이 따로 잡혀 있어, 막히면 일반 속도로 떨어진다.
+const FAST = true;
 
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"];
 const POS = ["verb", "i-adj", "na-adj", "noun", "adverb", "expression"];
@@ -86,7 +90,7 @@ const SCHEMA = {
     },
     vocab: {
       type: "array",
-      description: "학습 가치가 있는 어휘. 최대 8개.",
+      description: "학습 가치가 있는 어휘. 최대 12개.",
       items: {
         type: "object",
         additionalProperties: false,
@@ -132,7 +136,7 @@ const SCHEMA = {
     },
     kanji: {
       type: "array",
-      description: "이 페이지에서 짚고 갈 한자. 최대 5개.",
+      description: "이 페이지에서 짚고 갈 한자. 최대 6개.",
       items: {
         type: "object",
         additionalProperties: false,
@@ -282,40 +286,65 @@ function validLine(l: { jp: string; kana: string; ko: string }): boolean {
 }
 
 async function read(apiKey: string, image: ImageIn, title: string) {
-  const text = title
-    ? `${PROMPT}\n\n참고: 작품은 「${title}」입니다. 다만 작품 지식으로 내용을 채우지 말고, 이미지에 실제로 보이는 것만 읽으세요.`
-    : PROMPT;
+  // 작품명만 매번 달라진다 — 캐시되는 프롬프트(system) 뒤, 이미지와 같은 턴에 둔다.
+  const hint = title
+    ? `참고: 작품은 「${title}」입니다. 다만 작품 지식으로 내용을 채우지 말고, 이미지에 실제로 보이는 것만 읽으세요.`
+    : "";
 
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "x-api-key": apiKey,
-      "anthropic-version": "2023-06-01",
-      "content-type": "application/json",
+  const body: Record<string, unknown> = {
+    model: MODEL,
+    // thinking 이 max_tokens 를 같이 먹는다. 판독 JSON 자체는 2~3k면 충분하므로 여유 있게.
+    max_tokens: 8000,
+    // 프롬프트는 페이지가 바뀌어도 한 글자도 안 바뀐다. system 에 두고 캐시를 건다.
+    // 렌더 순서가 system → messages 라, 매번 달라지는 이미지가 뒤에 와도 이 앞부분은 재사용된다.
+    // (user 턴 안에 두면 이미지가 프리픽스 맨 앞이라 캐시가 절대 안 걸린다)
+    system: [{ type: "text", text: PROMPT, cache_control: { type: "ephemeral" } }],
+    output_config: {
+      effort: EFFORT,
+      format: { type: "json_schema", schema: SCHEMA },
     },
-    body: JSON.stringify({
-      model: MODEL,
-      // thinking 이 max_tokens 를 같이 먹는다. 판독 JSON 자체는 2~3k면 충분하므로 여유 있게.
-      max_tokens: 8000,
-      output_config: {
-        effort: EFFORT,
-        format: { type: "json_schema", schema: SCHEMA },
+    messages: [
+      {
+        role: "user",
+        // 이미지를 텍스트보다 앞에 두는 쪽이 결과가 낫다(Anthropic 권장).
+        content: [
+          { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
+          ...(hint ? [{ type: "text", text: hint }] : []),
+        ],
       },
-      messages: [
-        {
-          role: "user",
-          // 이미지를 텍스트보다 앞에 두는 쪽이 결과가 낫다(Anthropic 권장).
-          content: [
-            { type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } },
-            { type: "text", text },
-          ],
-        },
-      ],
-    }),
-  });
+    ],
+  };
+
+  const call = (fast: boolean) =>
+    fetch("https://api.anthropic.com/v1/messages", {
+      method: "POST",
+      headers: {
+        "x-api-key": apiKey,
+        "anthropic-version": "2023-06-01",
+        "content-type": "application/json",
+        ...(fast ? { "anthropic-beta": "fast-mode-2026-02-01" } : {}),
+      },
+      body: JSON.stringify(fast ? { ...body, speed: "fast" } : body),
+    });
+
+  const t0 = Date.now();
+  let res = await call(FAST);
+  // 패스트 모드는 별도 레이트리밋을 쓴다. 막히면 일반 속도로 한 번 더 — 판독이 죽는 것보단 낫다.
+  if (FAST && res.status === 429) {
+    console.warn("[read-manga] fast 레이트리밋 — 일반 속도로 재시도");
+    res = await call(false);
+  }
 
   if (!res.ok) throw new Error(`Anthropic ${res.status}: ${await res.text()}`);
   const data = await res.json();
+
+  // 속도 튜닝의 근거를 남긴다. Supabase 함수 로그에서 확인.
+  const u = data.usage ?? {};
+  console.log(
+    `[read-manga] ${Date.now() - t0}ms speed=${u.speed ?? (FAST ? "fast" : "standard")} ` +
+      `in=${u.input_tokens ?? "?"} cache_read=${u.cache_read_input_tokens ?? 0} ` +
+      `cache_write=${u.cache_creation_input_tokens ?? 0} out=${u.output_tokens ?? "?"}`
+  );
 
   // 안전 안내로 응답이 막힌 경우 — 빈 content 를 인덱싱하면 터진다.
   if (data.stop_reason === "refusal") {
