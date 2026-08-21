@@ -56,9 +56,10 @@ import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { MangaRead } from "./components/MangaRead";
-import { loadMangaBook, type MangaBook } from "./lib/manga";
+import { loadMangaBook, type MangaBook as MangaBookData } from "./lib/manga";
 import { flushMangaGroups, getMangaState, subscribeManga } from "./lib/mangaSession";
 import { Landing, type Mode } from "./components/Landing";
+import { MangaBook, type MangaSection } from "./components/MangaBook";
 import { Quiz, type QuizResult } from "./components/Quiz";
 import { Reference } from "./components/Reference";
 import { Home } from "./components/Home";
@@ -78,6 +79,7 @@ type View =
   | "wordbook"
   | "speaklog"
   | "scan"
+  | "mangabook"
   | "kanji"
   | "tutor"
   | "quiz"
@@ -87,14 +89,6 @@ type Phase = "loading" | "login" | "ready";
 
 /** 코스 진행 화면(전체 화면 집중 모드) — 하단 네비를 숨긴다 */
 const FOCUS_VIEWS: View[] = ["learn", "relearn", "speak", "test"];
-
-/** 묶음이 무엇으로 엮였는지 — 쌓인 양에 따라 모델이 고른다 */
-const KIND_LABEL: Record<string, string> = {
-  scene: "장면",
-  flow: "흐름",
-  theme: "주제",
-  day: "그날",
-};
 
 /** 단어장 정렬 기준: 0=어려움(아직 못 외움) 1=쉬움 2=완전 암기 */
 function difficultyRank(w: Word, progress: ProgressMap): 0 | 1 | 2 {
@@ -120,9 +114,7 @@ export default function App() {
   const [activity, setActivity] = useState<ActivityLog>({ access: {}, done: {} });
   // 단어장 방향: false=일본어 보기(뜻 가림), true=뜻 보기(단어 가림)
   const [bookReverse, setBookReverse] = useState(false);
-  // 단어장 보기: 만화 묶음별(공부한 순서) ↔ 난이도별
-  const [bookByGroup, setBookByGroup] = useState(true);
-  const [mangaBook, setMangaBook] = useState<MangaBook>({ groups: [], order: new Map() });
+  const [mangaBook, setMangaBook] = useState<MangaBookData>({ groups: [], order: new Map() });
   // 판독은 화면 밖에서 계속 돈다. 단어장에 가 있어도 진행 중이라는 걸 보여준다.
   const mangaReading = useSyncExternalStore(
     subscribeManga,
@@ -375,12 +367,24 @@ export default function App() {
   // 그룹 배정도 같이 얼려둔다 — 체크하자마자 다른 묶음으로 튀지 않게.
   // (행의 색은 실시간으로 바뀌어서 방금 체크한 게 보인다)
   const [bookRanks, setBookRanks] = useState<Map<string, 0 | 1 | 2>>(new Map());
+  // 만화 단어장을 열 때: 아직 이름 없는 구간에 이름을 붙이고 나서 읽는다.
+  // 순서를 안 맞추면 방금 담은 게 "방금 담은 것"으로만 보인다.
+  useEffect(() => {
+    if (view !== "mangabook") return;
+    let alive = true;
+    void flushMangaGroups().then(() =>
+      loadMangaBook(userId).then((b) => alive && setMangaBook(b))
+    );
+    return () => {
+      alive = false;
+    };
+  }, [view, userId]);
+
   const prevViewRef = useRef<View>(view);
   useEffect(() => {
     const wasBook = prevViewRef.current === "wordbook";
     prevViewRef.current = view;
     if (view !== "wordbook") return;
-    void flushMangaGroups().then(() => loadMangaBook(userId).then(setMangaBook));
 
     const rankOf = (list: Word[], base: Map<string, 0 | 1 | 2>) => {
       const m = new Map(base);
@@ -431,7 +435,7 @@ export default function App() {
       .map(([wordId, seq]) => ({ w: byId.get(wordId), seq }))
       .filter((x): x is { w: Word; seq: number } => Boolean(x.w));
 
-    const out: { key: string; name: string; subtitle: string | null; kind: string; words: Word[] }[] = [];
+    const out: MangaSection[] = [];
     const used = new Set<string>();
     for (const g of mangaBook.groups) {
       const ws = ordered.filter((x) => x.seq >= g.from_id && x.seq <= g.to_id).map((x) => x.w);
@@ -445,12 +449,6 @@ export default function App() {
     }
     return out;
   }, [mangaBook, words]);
-
-  /** 만화에서 오지 않은 단어장 단어 (하루 코스에서 쌓인 것) */
-  const courseBookWords = useMemo(
-    () => bookWords.filter((w) => !mangaBook.order.has(w.id)),
-    [bookWords, mangaBook]
-  );
 
   // 시험에 섞어 낼 '예전에 외운 단어' — 오늘 목록에 없고, 이미 한 번 외운 것들
   const pastWords = useMemo(() => {
@@ -733,7 +731,9 @@ export default function App() {
           </button>
         )}
         <h1 className="text-lg font-extrabold text-ink">
-          {view === "wordbook"
+          {view === "mangabook"
+            ? "만화 단어장 🗂"
+            : view === "wordbook"
             ? "단어장 📚"
             : view === "speaklog"
               ? "작문 기록 💬"
@@ -809,20 +809,12 @@ export default function App() {
           </div>
         ) : (
           <>
-            <div className="mb-3 flex flex-wrap items-center gap-2">
+            <div className="mb-3 flex items-center gap-2">
               <p className="min-w-0 flex-1 text-xs leading-relaxed text-mut">
                 내 단어 {bookDisplay.length}개. 꾹 누르면 정답,{" "}
                 <b className="text-sub">단어를 빠르게 두 번 탭</b>하면{" "}
                 <b className="text-gold">완전 암기</b>로 넘어가요.
               </p>
-              {mangaSections.length > 0 && (
-                <button
-                  onClick={() => setBookByGroup((v) => !v)}
-                  className="shrink-0 rounded-xl bg-card px-3 py-1.5 text-xs font-bold text-pri-deep shadow-soft transition active:scale-95"
-                >
-                  {bookByGroup ? "묶음별" : "난이도별"} ⇄
-                </button>
-              )}
               <button
                 onClick={() => setBookReverse((v) => !v)}
                 className="shrink-0 rounded-xl bg-card px-3 py-1.5 text-xs font-bold text-pri-deep shadow-soft transition active:scale-95"
@@ -830,86 +822,30 @@ export default function App() {
                 {bookReverse ? "한국어 → 일본어" : "일본어 → 한국어"} ⇄
               </button>
             </div>
-
-            {/* 만화 묶음 보기 — 공부한 순서 그대로, 이름은 그때 읽던 대사에서 나왔다 */}
-            {bookByGroup && mangaSections.length > 0 ? (
-              <div className="space-y-4">
-                {mangaSections.map((g) => (
-                  <section key={g.key}>
-                    <div className="mb-1.5 flex items-baseline gap-2 px-1">
-                      <h3 className="text-sm font-extrabold text-ink">{g.name}</h3>
-                      <span className="shrink-0 rounded-full bg-pri-soft px-2 py-0.5 text-[10px] font-bold text-pri-deep">
-                        {KIND_LABEL[g.kind] ?? "장면"}
-                      </span>
-                      <span className="text-xs font-semibold text-mut">{g.words.length}개</span>
-                    </div>
-                    {g.subtitle && (
-                      <p className="mb-1.5 px-1 text-xs leading-relaxed text-mut">{g.subtitle}</p>
-                    )}
-                    <WordTable
-                      words={g.words}
-                      progress={progress}
-                      mode={bookReverse ? "ko" : "jp"}
-                      onShowCard={(word, x, y) =>
-                        setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-                      }
-                      onSetLevel={(id, lv) =>
-                        update(id, (p, now) =>
-                          lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)
-                        )
-                      }
-                    />
-                  </section>
-                ))}
-                {courseBookWords.length > 0 && (
-                  <section>
-                    <div className="mb-1.5 flex items-baseline gap-2 px-1">
-                      <h3 className="text-sm font-extrabold text-sub">하루 코스에서</h3>
-                      <span className="text-xs font-semibold text-mut">
-                        {courseBookWords.length}개
-                      </span>
-                    </div>
-                    <WordTable
-                      words={courseBookWords}
-                      progress={progress}
-                      mode={bookReverse ? "ko" : "jp"}
-                      onShowCard={(word, x, y) =>
-                        setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-                      }
-                      onSetLevel={(id, lv) =>
-                        update(id, (p, now) =>
-                          lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)
-                        )
-                      }
-                    />
-                  </section>
-                )}
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {bookGroups.map((g) => (
-                  <section key={g.key}>
-                    <div className="mb-1.5 flex items-baseline gap-2 px-1">
-                      <h3 className={["text-sm font-extrabold", g.tone].join(" ")}>{g.label}</h3>
-                      <span className="text-xs font-semibold text-mut">{g.words.length}개</span>
-                    </div>
-                    <WordTable
-                      words={g.words}
-                      progress={progress}
-                      mode={bookReverse ? "ko" : "jp"}
-                      onShowCard={(word, x, y) =>
-                        setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
-                      }
-                      onSetLevel={(id, lv) =>
-                        update(id, (p, now) =>
-                          lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)
-                        )
-                      }
-                    />
-                  </section>
-                ))}
-              </div>
-            )}
+            {/* 만화에서 담은 단어도 여기 병합돼 있다. 묶음으로 보려면 만화 모드의 '묶음' 탭. */}
+            <div className="space-y-4">
+              {bookGroups.map((g) => (
+                <section key={g.key}>
+                  <div className="mb-1.5 flex items-baseline gap-2 px-1">
+                    <h3 className={["text-sm font-extrabold", g.tone].join(" ")}>{g.label}</h3>
+                    <span className="text-xs font-semibold text-mut">{g.words.length}개</span>
+                  </div>
+                  <WordTable
+                    words={g.words}
+                    progress={progress}
+                    mode={bookReverse ? "ko" : "jp"}
+                    onShowCard={(word, x, y) =>
+                      setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+                    }
+                    onSetLevel={(id, lv) =>
+                      update(id, (p, now) =>
+                        lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)
+                      )
+                    }
+                  />
+                </section>
+              ))}
+            </div>
           </>
         )
       ) : view === "speaklog" ? (
@@ -918,6 +854,19 @@ export default function App() {
           dictionary={words}
           onShowCard={(word, x, y) =>
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
+        />
+      ) : view === "mangabook" ? (
+        <MangaBook
+          sections={mangaSections}
+          progress={progress}
+          reverse={bookReverse}
+          onToggleReverse={() => setBookReverse((v) => !v)}
+          onShowCard={(word, x, y) =>
+            setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
+          }
+          onSetLevel={(id, lv) =>
+            update(id, (p, now) => (lv === "done" ? markRetired(p, now) : applyRating(p, lv, now)))
           }
         />
       ) : view === "scan" ? (
@@ -954,6 +903,7 @@ export default function App() {
                 busy={mangaReading}
                 onClick={() => go("home")}
               />
+              <NavBtn label="묶음" icon="🗂" active={view === "mangabook"} onClick={() => go("mangabook")} />
               <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
               <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
             </>

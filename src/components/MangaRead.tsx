@@ -100,6 +100,22 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
     },
   };
 
+  /**
+   * 대사에 **나온 순서대로** 세운다.
+   * 모델이 주는 순서는 뒤죽박죽이라(뒤에 나온 단어가 먼저 오기도 한다) 원문에서의
+   * 위치로 직접 정렬한다. 원문에 없으면(활용이 심하거나 효과음) 뒤로 보낸다.
+   */
+  const inLineOrder = <T,>(list: T[], jp: string, keyOf: (x: T) => string[]): T[] =>
+    list
+      .map((x, i) => {
+        const at = keyOf(x)
+          .map((k) => (k ? jp.indexOf(k) : -1))
+          .filter((n) => n >= 0);
+        return { x, pos: at.length ? Math.min(...at) : Number.MAX_SAFE_INTEGER, i };
+      })
+      .sort((a, b) => a.pos - b.pos || a.i - b.i) // 못 찾은 것끼리는 원래 순서 유지
+      .map((e) => e.x);
+
   const forLine = <T extends { line_index: number }>(list: T[], i: number) =>
     list.filter((x) => x.line_index === i);
   const loose = <T extends { line_index: number }>(list: T[]) =>
@@ -144,15 +160,20 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
         <div className="sticky top-0 z-20 -mx-4 bg-page/95 px-4 pb-2 pt-2 backdrop-blur sm:-mx-5 sm:px-5">
           <div className="overflow-hidden rounded-2xl bg-card shadow-soft">
             {imgOpen && (
-              <img
-                src={preview}
-                alt="판독 중인 페이지"
-                className={[
-                  "mx-auto max-h-[38vh] w-auto max-w-full object-contain transition",
-                  stage === "reading" ? "opacity-50" : "",
-                ].join(" ")}
-              />
+              // 원본 크기 그대로. 화면보다 크면 이 칸 안에서 스크롤한다 —
+              // 줄여 버리면 후리가나가 안 보여서 옆에 띄워 둔 의미가 없다.
+              <div className="max-h-[70vh] overflow-auto overscroll-contain">
+                <img
+                  src={preview}
+                  alt="판독 중인 페이지"
+                  className={[
+                    "mx-auto block h-auto max-w-full transition",
+                    stage === "reading" ? "opacity-50" : "",
+                  ].join(" ")}
+                />
+              </div>
             )}
+            {/* 접기 버튼은 스크롤 밖에 둔다 — 긴 페이지에서도 항상 손에 닿게 */}
             <button
               onClick={() => setImgOpen((v) => !v)}
               className="w-full border-t border-line py-1.5 text-[11px] font-bold text-mut transition hover:text-sub"
@@ -195,9 +216,11 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
           )}
 
           {result.lines.map((l, i) => {
-            const v = forLine(result.vocab, i);
+            const v = inLineOrder(forLine(result.vocab, i), l.jp, (x) => [x.surface, x.word]);
+            // 문법은 원문 검색으로 순서를 못 정한다. 〜って 는 「終わってない」 안에도
+            // 들어 있어서 엉뚱한 자리를 짚는다. 여기는 모델이 준 순서를 그대로 쓴다.
             const g = forLine(result.grammar, i);
-            const k = forLine(result.kanji, i);
+            const k = inLineOrder(forLine(result.kanji, i), l.jp, (x) => [x.char]);
             return (
               <article key={i} className="rounded-2xl bg-card p-4 shadow-soft">
                 {/* 대사 */}
