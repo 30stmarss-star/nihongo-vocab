@@ -34,6 +34,13 @@ export interface MangaLine {
   jp: string;
   kana: string;
   ko: string;
+  note: string; // 뉘앙스·생략·말투 등 참고사항. 없으면 빈 문자열
+}
+
+export interface MangaGrammar {
+  point: string; // 문법 형태 그대로 (〜てる 등)
+  ko: string;
+  line_index: number;
 }
 
 export interface MangaVocab {
@@ -57,6 +64,7 @@ export interface MangaKanji {
   ko: string;
   radical: string;
   hint: string;
+  line_index: number;
 }
 
 export interface MangaSfx {
@@ -68,6 +76,7 @@ export interface MangaReadResult {
   gist: string;
   lines: MangaLine[];
   vocab: MangaVocab[];
+  grammar: MangaGrammar[];
   kanji: MangaKanji[];
   sfx: MangaSfx[];
 }
@@ -174,7 +183,17 @@ export async function readManga(image: MangaImage, title?: string): Promise<Mang
   }
   if ((data as { error?: string })?.error) throw new Error((data as { error: string }).error);
 
-  const read = (data as { read?: MangaReadResult })?.read;
+  const read = (data as { read?: Partial<MangaReadResult> })?.read;
   if (!read) throw new Error("판독 결과가 비어 있어요. 다시 시도해 주세요.");
-  return read;
+
+  // 배포 시차로 옛 함수가 응답할 수 있다(필드가 통째로 없음). 빈 배열로 메워 화면이 죽지 않게.
+  const arr = <T,>(x: unknown): T[] => (Array.isArray(x) ? (x as T[]) : []);
+  return {
+    gist: typeof read.gist === "string" ? read.gist : "",
+    lines: arr<MangaLine>(read.lines).map((l) => ({ ...l, note: l.note ?? "" })),
+    vocab: arr<MangaVocab>(read.vocab),
+    grammar: arr<MangaGrammar>(read.grammar),
+    kanji: arr<MangaKanji>(read.kanji).map((k) => ({ ...k, line_index: k.line_index ?? -1 })),
+    sfx: arr<MangaSfx>(read.sfx),
+  };
 }

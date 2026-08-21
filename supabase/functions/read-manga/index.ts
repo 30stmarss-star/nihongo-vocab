@@ -25,8 +25,9 @@ const POS = ["verb", "i-adj", "na-adj", "noun", "adverb", "expression"];
 
 // 프롬프트가 정한 상한. 모델이 넘겨도 서버에서 자른다(구조화 출력은 배열 길이 제약을 못 건다).
 const MAX_LINES = 6;
-const MAX_VOCAB = 8;
-const MAX_KANJI = 5;
+const MAX_VOCAB = 12; // 대사마다 붙으므로 페이지 전체 기준으로는 여유를 준다
+const MAX_GRAMMAR = 8;
+const MAX_KANJI = 6;
 const MAX_SFX = 8;
 
 const CORS = {
@@ -50,8 +51,30 @@ const SCHEMA = {
           jp: { type: "string", description: "원문 그대로(한자 포함)" },
           kana: { type: "string", description: "전체 히라가나 독음" },
           ko: { type: "string", description: "한국어 번역" },
+          note: {
+            type: "string",
+            description:
+              "이 대사에서 짚을 참고사항 한 줄(뉘앙스·생략된 말·말투·문화). 없으면 빈 문자열.",
+          },
         },
-        required: ["jp", "kana", "ko"],
+        required: ["jp", "kana", "ko", "note"],
+      },
+    },
+    grammar: {
+      type: "array",
+      description: "대사에 쓰인 문법. 최대 8개.",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          point: { type: "string", description: "문법 형태 그대로. 예: 〜てる, 〜なきゃ, 〜んだ" },
+          ko: { type: "string", description: "무슨 뜻이고 언제 쓰는지 한국어로 한두 줄" },
+          line_index: {
+            type: "integer",
+            description: "이 문법이 나온 lines 의 인덱스(0부터). 대사 밖이면 -1.",
+          },
+        },
+        required: ["point", "ko", "line_index"],
       },
     },
     vocab: {
@@ -113,8 +136,12 @@ const SCHEMA = {
           ko: { type: "string", description: "한국식 훈독 '먹을 식' 형태" },
           radical: { type: "string", description: "부수" },
           hint: { type: "string", description: "기억을 돕는 한 줄(한국어)" },
+          line_index: {
+            type: "integer",
+            description: "이 한자가 나온 lines 의 인덱스(0부터). 대사 밖이면 -1.",
+          },
         },
-        required: ["char", "on", "kun", "ko", "radical", "hint"],
+        required: ["char", "on", "kun", "ko", "radical", "hint", "line_index"],
       },
     },
     sfx: {
@@ -131,7 +158,7 @@ const SCHEMA = {
       },
     },
   },
-  required: ["gist", "lines", "vocab", "kanji", "sfx"],
+  required: ["gist", "lines", "vocab", "grammar", "kanji", "sfx"],
 };
 
 const PROMPT = `이 이미지는 일본 만화의 한 페이지입니다. 원서로 읽다가 막혀서 캡처한 것입니다.
@@ -143,16 +170,30 @@ const PROMPT = `이 이미지는 일본 만화의 한 페이지입니다. 원서
 **읽는 순서**: 일본 만화는 세로쓰기이고 페이지의 **오른쪽 위에서 왼쪽 아래로** 읽습니다.
 같은 단에서는 오른쪽 말풍선이 먼저입니다. lines 배열은 반드시 이 순서로 채우세요.
 
+**결과는 대사 하나하나를 파고들며 공부하는 화면에 쓰입니다.** 대사 아래에 그 대사의
+어휘·문법·참고사항이 붙어서 위에서 아래로 읽어 내려갑니다. 그래서 vocab·grammar·kanji 의
+line_index 를 **정확히** 채워야 합니다 — 이게 틀리면 엉뚱한 대사 밑에 붙습니다.
+
 **lines (최대 6개)**
 - 말풍선·모노로그 안의 대사만. 한 말풍선이 한 항목입니다.
 - jp 는 원문 그대로(한자 포함), kana 는 문장 전체의 히라가나 독음, ko 는 자연스러운 한국어 번역.
 - 말풍선이 6개를 넘으면 학습 가치가 큰 것부터 6개만 고르되, 고른 것끼리의 순서는 유지합니다.
+- note: 그 대사에서 짚을 게 있으면 한 줄. 생략된 주어·조사, 거친/공손한 말투, 캐릭터 특유의
+  어미, 교재에는 안 나오는 회화 습관, 문화적 배경 같은 것. **없으면 빈 문자열로 두세요.**
+  억지로 채우지 마세요 — 번역만 봐도 아는 내용을 반복하면 방해만 됩니다.
+
+**grammar (최대 8개)**
+- 대사에 실제로 쓰인 문법 형태. 회화체·축약형 위주로 고릅니다. (〜てる·〜なきゃ·〜んだ·〜ちゃう 등)
+- point 는 형태 그대로, ko 는 무슨 뜻이고 언제 쓰는지 한국어로 한두 줄.
+  가능하면 교재체 대응형을 같이 적으세요. (예: 〜てる → 〜ている의 축약, 회화에서만)
+- line_index 로 어느 대사에서 나왔는지 반드시 표시합니다.
+- 같은 문법이 여러 대사에 나오면 처음 나온 대사에 한 번만.
 
 **sfx (효과음·손글씨)**
 - 말풍선 밖의 효과음(ドドド·バキッ 등)과 손글씨 방백은 **lines 가 아니라 여기에** 넣습니다.
 - 이걸 대사에 섞지 마세요. 격투 장면에서 특히 주의.
 
-**vocab (최대 8개)**
+**vocab (최대 12개)**
 - 구어·속어·축약형처럼 교재에서 안 배우는 것 위주로 고릅니다. 고유명사·숫자·인명은 제외.
 - word 는 반드시 **사전형(사전에 실리는 표준 표기)**. 보통 한자로 쓰는 말은 한자로 복원합니다.
   본문에 나온 활용형은 surface 에 따로 넣습니다. (예: 「食べてる」→ word 食べる / surface 食べてる)
@@ -163,8 +204,9 @@ const PROMPT = `이 이미지는 일본 만화의 한 페이지입니다. 원서
 - freq: 1(핵심)·2(보통)·3(덜 중요).
 - line_index: 그 단어가 나온 lines 의 인덱스. 대사가 아니라 효과음·간판 등에서 나왔으면 -1.
 
-**kanji (최대 5개)**
+**kanji (최대 6개)**
 - 이 페이지의 한자 중 짚고 갈 만한 것. 이미지에 실제로 보이는 한자만.
+- line_index 로 어느 대사에서 나왔는지 표시합니다. 대사 밖(간판·효과음 등)이면 -1.
 
 **gist**: 이 페이지에서 무슨 일이 벌어지는지 한 줄(한국어).`;
 
@@ -200,6 +242,17 @@ interface VocabOut {
   line_index: number;
 }
 
+/**
+ * 역참조 인덱스를 실제 대사 범위 안으로 눕힌다.
+ * 범위를 벗어나면 -1(대사 밖) — 엉뚱한 대사 밑에 붙는 것보다 낫다.
+ */
+function normIndex(v: { line_index?: unknown }, lineCount: number): void {
+  const i = v.line_index;
+  if (!Number.isInteger(i) || (i as number) < 0 || (i as number) >= lineCount) {
+    v.line_index = -1;
+  }
+}
+
 function validVocab(v: VocabOut, lineCount: number): boolean {
   if (!v || typeof v.word !== "string" || typeof v.reading !== "string") return false;
   if (!v.word.trim() && v.reading.trim()) v.word = v.reading;
@@ -209,10 +262,7 @@ function validVocab(v: VocabOut, lineCount: number): boolean {
   if (!HANGUL.test(v.ko ?? "")) return false; // 뜻은 한국어
   if (!POS.includes(v.pos)) return false;
   if (!LEVELS.includes(v.level)) return false;
-  // 역참조가 범위를 벗어나면 예문을 못 붙인다 — -1(대사 아님)로 눕힌다.
-  if (!Number.isInteger(v.line_index) || v.line_index < 0 || v.line_index >= lineCount) {
-    v.line_index = -1;
-  }
+  normIndex(v, lineCount);
   return true;
 }
 
@@ -289,15 +339,34 @@ Deno.serve(async (req) => {
     const vocab = (Array.isArray(raw.vocab) ? raw.vocab : [])
       .filter((v: VocabOut) => validVocab(v, lines.length))
       .slice(0, MAX_VOCAB);
+    const grammar = (Array.isArray(raw.grammar) ? raw.grammar : [])
+      .filter((g: { point?: string; ko?: string; line_index?: number }) => {
+        if (typeof g?.point !== "string" || !g.point.trim()) return false;
+        if (!HANGUL.test(g.ko ?? "")) return false; // 설명은 한국어
+        normIndex(g, lines.length);
+        return true;
+      })
+      .slice(0, MAX_GRAMMAR);
     const kanji = (Array.isArray(raw.kanji) ? raw.kanji : [])
-      .filter((k: { char?: string }) => typeof k?.char === "string" && JP.test(k.char))
+      .filter((k: { char?: string; line_index?: number }) => {
+        if (typeof k?.char !== "string" || !JP.test(k.char)) return false;
+        normIndex(k, lines.length);
+        return true;
+      })
       .slice(0, MAX_KANJI);
     const sfx = (Array.isArray(raw.sfx) ? raw.sfx : [])
       .filter((s: { jp?: string }) => typeof s?.jp === "string" && s.jp.trim())
       .slice(0, MAX_SFX);
 
     return json({
-      read: { gist: typeof raw.gist === "string" ? raw.gist : "", lines, vocab, kanji, sfx },
+      read: {
+        gist: typeof raw.gist === "string" ? raw.gist : "",
+        lines,
+        vocab,
+        grammar,
+        kanji,
+        sfx,
+      },
     });
   } catch (e) {
     return json({ error: e instanceof Error ? e.message : String(e) }, 500);
