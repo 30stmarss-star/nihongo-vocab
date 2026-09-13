@@ -13,12 +13,13 @@ import {
   startMangaRead,
   subscribeManga,
 } from "../lib/mangaSession";
+import { saveCard, type SavedCard } from "../lib/mangaSaved";
 
 /**
  * 만화 판독 화면.
  *
  * 탭으로 대사·어휘·문법을 갈라두면 한 대사를 공부하려고 탭을 세 번 오가야 한다.
- * 그래서 **대사 하나가 블록 하나**다. 원문 → 후리가나 → 번역 → 그 대사의 어휘·문법·한자·참고가
+ * 그래서 **대사 하나가 블록 하나**다. 원문 → 후리가나 → 번역 → 그 대사의 어휘·문법·한자가
  * 한 덩어리로 붙고, 위에서 아래로 읽어 내려가면 페이지 하나가 끝난다.
  *
  * 캡처는 위에 고정해 둔다. 세로쓰기를 눈으로 좇으면서 풀이를 봐야 하는데
@@ -41,7 +42,7 @@ const LEVEL_TONE: Record<string, string> = {
   N1: "bg-coral-soft text-coral",
 };
 
-export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => void }) {
+export function MangaRead({ onSaved, userId }: { onSaved: (rows: MangaSavedRow[]) => void; userId: string | null }) {
   // 판독 상태는 화면 밖(mangaSession)에 있다 — 여기를 떠났다 와도 이어진다
   const { stage, title, preview, result, err, kept, keeping } = useSyncExternalStore(
     subscribeManga,
@@ -49,17 +50,46 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
   );
   const [dragging, setDragging] = useState(false);
   const [imgOpen, setImgOpen] = useState(true);
+  const [sourceUrl, setSourceUrl] = useState("");
+  const [savedLines, setSavedLines] = useState<Set<number>>(new Set());
+  const [savingLine, setSavingLine] = useState<number | null>(null);
+  const [saveError, setSaveError] = useState("");
   const fileRef = useRef<HTMLInputElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
 
   const start = (file: File) => {
     if (!isSupportedImage(file)) return;
     setImgOpen(true);
+    setSavedLines(new Set());
+    setSaveError("");
     topRef.current?.scrollIntoView({ block: "start" });
     void startMangaRead(file);
   };
 
   const keep = (list: MangaVocab[]) => void keepMangaVocab(list, onSaved);
+
+  const saveLine = async (index: number) => {
+    if (!userId || !result || savingLine !== null) return;
+    const line = result.lines[index];
+    if (!line) return;
+    const source = { title, url: /^https:\/\/shonenjumpplus\.com\//.test(sourceUrl) ? sourceUrl : "" };
+    const card: SavedCard = {
+      id: crypto.randomUUID(), kind: "문장", text: line.jp, reading: line.kana,
+      translation: line.ko, source, savedAt: new Date().toISOString(),
+      vocabulary: result.vocab.filter(v => v.line_index === index).map(v => ({
+        text: v.word, reading: v.reading, translation: v.ko, level: v.level,
+        surface: v.surface, parts: v.parts, hanja: v.hanja,
+      })),
+      grammar: result.grammar.filter(g => g.line_index === index).map(g => ({ text: g.point, translation: g.ko })),
+      kanji: result.kanji.filter(k => k.line_index === index).map(k => ({
+        text: k.char, translation: k.ko, on: k.on, kun: k.kun, radical: k.radical, hint: k.hint,
+      })),
+    };
+    setSavingLine(index); setSaveError("");
+    try { await saveCard(userId, card); setSavedLines(prev => new Set(prev).add(index)); }
+    catch (e) { setSaveError(e instanceof Error ? e.message : "대사를 저장하지 못했습니다."); }
+    finally { setSavingLine(null); }
+  };
 
   // 붙여넣기는 window 에서 받는다 — 결과를 읽는 중에도 바로 다음 장을 넣을 수 있게.
   useEffect(() => {
@@ -136,6 +166,20 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
         }}
       />
 
+      <div className="rounded-2xl bg-card px-4 py-3 shadow-soft">
+        <a href="https://shonenjumpplus.com/" target="_blank" rel="noopener noreferrer"
+          className="inline-flex rounded-xl bg-pri-soft px-3 py-2 text-sm font-bold text-pri-deep">
+          점프플러스 열기 ↗
+        </a>
+        <p className="mt-2 text-xs leading-relaxed text-sub sm:hidden">
+          만화에서 스크린샷을 찍고 이 화면으로 돌아와 ‘스크린샷 선택’을 누르세요.
+        </p>
+        <input value={sourceUrl} onChange={e => setSourceUrl(e.target.value.trim())}
+          inputMode="url" type="url" placeholder="읽는 만화 링크 (선택)"
+          aria-label="읽는 만화의 점프플러스 링크"
+          className="mt-2 w-full rounded-lg border border-line bg-page px-2 py-1.5 text-xs text-ink outline-none focus:border-pri" />
+      </div>
+
       {/* 작품 이름 — 결과를 보는 중엔 접어둔다(자리를 많이 먹는다) */}
       {stage !== "done" && (
         <label className="block rounded-2xl bg-card p-3 shadow-soft">
@@ -202,18 +246,13 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
       {/* ── 결과: 대사마다 한 덩어리로 쭉 ── */}
       {stage === "done" && result && (
         <div className="space-y-3">
-          {result.gist && (
-            <p className="rounded-2xl bg-card px-4 py-3 text-sm leading-relaxed text-sub shadow-soft">
-              {result.gist}
-            </p>
-          )}
-
           {result.lines.length === 0 && (
             <div className="rounded-2xl bg-card px-6 py-12 text-center text-sm text-mut shadow-soft">
               읽어낼 수 있는 대사가 없었어요.
               <br />더 크게 잘라서 다시 넣어보세요.
             </div>
           )}
+          {saveError && <p role="alert" className="rounded-xl bg-gold-soft px-3 py-2 text-xs text-gold">{saveError}</p>}
 
           {result.lines.map((l, i) => {
             const v = inLineOrder(forLine(result.vocab, i), l.jp, (x) => [x.surface, x.word]);
@@ -235,13 +274,12 @@ export function MangaRead({ onSaved }: { onSaved: (rows: MangaSavedRow[]) => voi
                       {l.ko}
                     </div>
                   </div>
+                  {userId && <button type="button" onClick={() => void saveLine(i)}
+                    disabled={!userId || savedLines.has(i) || savingLine === i}
+                    className="shrink-0 rounded-lg bg-pri-soft px-2.5 py-1 text-[11px] font-bold text-pri-deep disabled:opacity-50">
+                    {savedLines.has(i) ? "저장됨 ✓" : savingLine === i ? "저장 중…" : "대사 저장"}
+                  </button>}
                 </div>
-
-                {l.note && (
-                  <div className="mt-3 rounded-xl bg-page px-3 py-2 text-xs leading-relaxed text-sub">
-                    <b className="text-ink">참고</b> · {l.note}
-                  </div>
-                )}
 
                 {v.length > 0 && (
                   <Section label="어휘">
@@ -483,9 +521,9 @@ function DropZone({
         <div className={["leading-relaxed text-sub", big ? "text-sm" : "text-xs"].join(" ")}>
           {big ? (
             <>
-              막히는 페이지를 <b className="text-ink">캡처해서 붙여넣으세요</b>.
+              막히는 페이지를 <b className="text-ink">캡처해서 넣으세요</b>.
               <br />
-              대사마다 어휘·문법·참고를 풀어서 보여줘요.
+              대사마다 어휘·문법·한자를 풀어서 보여줘요.
             </>
           ) : (
             <b className="text-ink">다음 페이지</b>
@@ -498,9 +536,9 @@ function DropZone({
             big ? "px-6 py-3 text-base" : "px-5 py-2 text-sm",
           ].join(" ")}
         >
-          📖 사진 고르기
+          📖 <span className="sm:hidden">스크린샷 선택</span><span className="hidden sm:inline">사진 고르기</span>
         </button>
-        <div className="text-xs leading-relaxed text-mut">
+        <div className="hidden text-xs leading-relaxed text-mut sm:block">
           <kbd className="rounded bg-page px-1.5 py-0.5 font-sans">Ctrl</kbd>+
           <kbd className="rounded bg-page px-1.5 py-0.5 font-sans">V</kbd> 로 바로 붙여넣거나 끌어다 놓아도 돼요.
         </div>

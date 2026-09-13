@@ -79,7 +79,7 @@ export function Landing({ plan, streak, bandLabel, onPick }: Props) {
           대사·어휘·한자를 풀어서 보여줘요.
         </p>
         <div className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-pri-soft px-3 py-1.5 text-xs font-bold text-pri-deep">
-          캡처 붙여넣기 →
+          휴대폰 스크린샷으로도 읽기 →
         </div>
       </button>
 

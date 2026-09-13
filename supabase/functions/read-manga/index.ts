@@ -34,8 +34,7 @@ const FAST = true;
 const LEVELS = ["N5", "N4", "N3", "N2", "N1"];
 const POS = ["verb", "i-adj", "na-adj", "noun", "adverb", "expression"];
 
-// 프롬프트가 정한 상한. 모델이 넘겨도 서버에서 자른다(구조화 출력은 배열 길이 제약을 못 건다).
-const MAX_LINES = 6;
+// 부가 설명만 제한한다. 대사는 임의로 잘라 누락시키지 않는다.
 const MAX_VOCAB = 12; // 대사마다 붙으므로 페이지 전체 기준으로는 여유를 준다
 const MAX_GRAMMAR = 8;
 const MAX_KANJI = 6;
@@ -54,7 +53,7 @@ const SCHEMA = {
     gist: { type: "string", description: "이 페이지에서 벌어지는 일 한 줄 요약(한국어)" },
     lines: {
       type: "array",
-      description: "읽는 순서대로의 대사. 최대 6개.",
+      description: "읽는 순서대로 화면에 보이는 말풍선·독백·나레이션 상자·의미 있는 큰 문구.",
       items: {
         type: "object",
         additionalProperties: false,
@@ -62,13 +61,13 @@ const SCHEMA = {
           jp: { type: "string", description: "원문 그대로(한자 포함)" },
           kana: { type: "string", description: "전체 히라가나 독음" },
           ko: { type: "string", description: "한국어 번역" },
+          reading_order: { type: "integer", description: "페이지의 실제 만화 읽기 순서. 첫 말풍선은 1." },
           note: {
             type: "string",
-            description:
-              "이 대사에서 짚을 참고사항 한 줄(뉘앙스·생략된 말·말투·문화). 없으면 빈 문자열.",
+            description: "항상 빈 문자열. 장면 해설은 생성하지 않습니다.",
           },
         },
-        required: ["jp", "kana", "ko", "note"],
+        required: ["jp", "kana", "ko", "reading_order", "note"],
       },
     },
     grammar: {
@@ -172,28 +171,54 @@ const SCHEMA = {
   required: ["gist", "lines", "vocab", "grammar", "kanji", "sfx"],
 };
 
-const PROMPT = `이 이미지는 일본 만화의 한 페이지입니다. 원서로 읽다가 막혀서 캡처한 것입니다.
+// A small first response makes dialogue visible while the full lesson is still being prepared.
+const PREVIEW_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  properties: {
+    lines: {
+      type: "array",
+      items: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          jp: { type: "string" },
+          kana: { type: "string" },
+          ko: { type: "string" },
+          reading_order: { type: "integer" },
+        },
+        required: ["jp", "kana", "ko", "reading_order"],
+      },
+    },
+  },
+  required: ["lines"],
+};
+
+const PROMPT = `이 이미지는 원서로 읽던 일본 만화 화면입니다. 양면 펼침이라 두 페이지가 함께 보일 수도 있습니다.
 
 **가장 중요한 규칙: 읽을 수 없는 것은 지어내지 말고 생략하세요.**
 글자가 잘렸거나, 흐리거나, 가려져 있거나, 손글씨가 확실히 판독되지 않으면 그 항목을 통째로 빼세요.
 틀린 후리가나는 없느니만 못합니다. 확신이 서는 것만 넣으세요. 한 항목도 확실하지 않으면 빈 배열로 두세요.
 
 **읽는 순서**: 일본 만화는 세로쓰기이고 페이지의 **오른쪽 위에서 왼쪽 아래로** 읽습니다.
+양면 펼침이면 오른쪽 페이지의 모든 내용을 먼저 읽고, 그다음 왼쪽 페이지를 읽으세요. 한쪽만 버리지 마세요.
 같은 단에서는 오른쪽 말풍선이 먼저입니다. lines 배열은 반드시 이 순서로 채우세요.
+각 말풍선에 reading_order 를 1부터 매기세요. 응답 배열의 출력 순서와 무관하게 이 숫자가 실제 읽기 순서입니다.
+칸이 여럿이면 먼저 칸의 순서를 정하고, 각 칸 안에서 오른쪽에서 왼쪽으로 읽으세요.
 
 **결과는 대사 하나하나를 파고들며 공부하는 화면에 쓰입니다.** 대사 아래에 그 대사의
-어휘·문법·참고사항이 붙어서 위에서 아래로 읽어 내려갑니다. 그래서 vocab·grammar·kanji 의
+어휘·문법·한자 설명이 붙어서 위에서 아래로 읽어 내려갑니다. 그래서 vocab·grammar·kanji 의
 line_index 를 **정확히** 채워야 합니다 — 이게 틀리면 엉뚱한 대사 밑에 붙습니다.
 **그리고 vocab·grammar·kanji 는 각 대사 안에서 "원문에 나온 순서대로" 나열하세요.**
 먼저 나오는 것을 먼저 적습니다. 뒤에 나온 걸 앞에 적으면 읽어 내려가는 흐름이 어긋납니다.
 
-**lines (최대 6개)**
-- 말풍선·모노로그 안의 대사만. 한 말풍선이 한 항목입니다.
+**lines (개수 제한 없음)**
+- 말풍선 대사뿐 아니라 독백, 사각 나레이션 상자, 작품 이해에 필요한 큰 문구도 읽으세요.
+- 한 말풍선·나레이션 상자·독립 문구가 한 항목입니다. 표지에서도 왼쪽 아래 상자와 화면 위에 겹친 큰 문구를 빠뜨리지 마세요.
+- 작품 로고, 사이트 메뉴, 광고 배너, 판권 표시는 학습 문장에 넣지 마세요.
 - jp 는 원문 그대로(한자 포함), kana 는 문장 전체의 히라가나 독음, ko 는 자연스러운 한국어 번역.
-- 말풍선이 6개를 넘으면 학습 가치가 큰 것부터 6개만 고르되, 고른 것끼리의 순서는 유지합니다.
-- note: 그 대사에서 짚을 게 있으면 한 줄. 생략된 주어·조사, 거친/공손한 말투, 캐릭터 특유의
-  어미, 교재에는 안 나오는 회화 습관, 문화적 배경 같은 것. **없으면 빈 문자열로 두세요.**
-  억지로 채우지 마세요 — 번역만 봐도 아는 내용을 반복하면 방해만 됩니다.
+- 화면에 완전히 보이는 말풍선·독백·나레이션 상자·독립 문구를 먼저 모두 세고, 빠짐없이 읽는 순서로 기록하세요.
+- note: 항상 빈 문자열. 장면이나 줄거리 해설을 쓰지 마세요.
 
 **grammar (최대 8개)**
 - 대사에 실제로 쓰인 문법 형태. 회화체·축약형 위주로 고릅니다. (〜てる·〜なきゃ·〜んだ·〜ちゃう 등)
@@ -285,14 +310,14 @@ function validLine(l: { jp: string; kana: string; ko: string }): boolean {
   return HANGUL.test(l.ko ?? "");
 }
 
-async function read(apiKey: string, image: ImageIn, title: string) {
+async function read(apiKey: string, image: ImageIn, title: string, quality: "fast" | "accurate") {
   // 작품명만 매번 달라진다 — 캐시되는 프롬프트(system) 뒤, 이미지와 같은 턴에 둔다.
   const hint = title
     ? `참고: 작품은 「${title}」입니다. 다만 작품 지식으로 내용을 채우지 말고, 이미지에 실제로 보이는 것만 읽으세요.`
     : "";
 
   const body: Record<string, unknown> = {
-    model: MODEL,
+    model: quality === "fast" ? "claude-sonnet-5" : MODEL,
     // thinking 이 max_tokens 를 같이 먹는다. 판독 JSON 자체는 2~3k면 충분하므로 여유 있게.
     max_tokens: 8000,
     // 프롬프트는 페이지가 바뀌어도 한 글자도 안 바뀐다. system 에 두고 캐시를 건다.
@@ -300,7 +325,7 @@ async function read(apiKey: string, image: ImageIn, title: string) {
     // (user 턴 안에 두면 이미지가 프리픽스 맨 앞이라 캐시가 절대 안 걸린다)
     system: [{ type: "text", text: PROMPT, cache_control: { type: "ephemeral" } }],
     output_config: {
-      effort: EFFORT,
+      effort: quality === "fast" ? "low" : EFFORT,
       format: { type: "json_schema", schema: SCHEMA },
     },
     messages: [
@@ -328,9 +353,10 @@ async function read(apiKey: string, image: ImageIn, title: string) {
     });
 
   const t0 = Date.now();
-  let res = await call(FAST);
+  const useFastMode = quality === "accurate" && FAST;
+  let res = await call(useFastMode);
   // 패스트 모드는 별도 레이트리밋을 쓴다. 막히면 일반 속도로 한 번 더 — 판독이 죽는 것보단 낫다.
-  if (FAST && res.status === 429) {
+  if (useFastMode && res.status === 429) {
     console.warn("[read-manga] fast 레이트리밋 — 일반 속도로 재시도");
     res = await call(false);
   }
@@ -341,7 +367,7 @@ async function read(apiKey: string, image: ImageIn, title: string) {
   // 속도 튜닝의 근거를 남긴다. Supabase 함수 로그에서 확인.
   const u = data.usage ?? {};
   console.log(
-    `[read-manga] ${Date.now() - t0}ms speed=${u.speed ?? (FAST ? "fast" : "standard")} ` +
+    `[read-manga] ${Date.now() - t0}ms model=${quality === "fast" ? "sonnet-5" : "opus-5"} speed=${u.speed ?? (useFastMode ? "fast" : "standard")} ` +
       `in=${u.input_tokens ?? "?"} cache_read=${u.cache_read_input_tokens ?? 0} ` +
       `cache_write=${u.cache_creation_input_tokens ?? 0} out=${u.output_tokens ?? "?"}`
   );
@@ -353,6 +379,52 @@ async function read(apiKey: string, image: ImageIn, title: string) {
   const out = (data.content ?? []).find((b: { type: string }) => b.type === "text")?.text;
   if (!out) throw new Error("응답에 판독 결과가 없습니다. 다시 시도해 주세요.");
   return JSON.parse(out);
+}
+
+function orderLines(raw: unknown[]) {
+  const indexed = raw.map((line, originalIndex) => ({ line, originalIndex }))
+    .filter(({ line }) => validLine(line as { jp: string; kana: string; ko: string }))
+    .sort((a, b) => {
+      const aOrder = (a.line as { reading_order?: unknown }).reading_order;
+      const bOrder = (b.line as { reading_order?: unknown }).reading_order;
+      const aRank = Number.isInteger(aOrder) && (aOrder as number) > 0 ? aOrder as number : a.originalIndex + 1;
+      const bRank = Number.isInteger(bOrder) && (bOrder as number) > 0 ? bOrder as number : b.originalIndex + 1;
+      return aRank - bRank || a.originalIndex - b.originalIndex;
+    });
+  return {
+    lines: indexed.map(({ line }) => line),
+    indexMap: new Map(indexed.map(({ originalIndex }, sortedIndex) => [originalIndex, sortedIndex])),
+  };
+}
+
+async function preview(apiKey: string, image: ImageIn) {
+  const started = Date.now();
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: {
+      "x-api-key": apiKey,
+      "anthropic-version": "2023-06-01",
+      "content-type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "claude-haiku-4-5-20251001",
+      max_tokens: 2500,
+      system: "일본 만화 화면에서 완전히 보이는 일본어 문장을 전부 읽는 순서대로 추출하세요. 화면에 두 페이지가 펼쳐져 있으면 오른쪽 페이지를 전부 읽고 이어서 왼쪽 페이지를 전부 읽으세요. 한쪽을 버리지 마세요. 말풍선뿐 아니라 독백, 사각 나레이션 상자, 작품 이해에 필요한 큰 문구도 포함합니다. 표지의 왼쪽 아래 설명 상자와 그림 위에 겹친 문구를 건너뛰지 마세요. 작품 로고·사이트 메뉴·광고는 제외합니다. 각 페이지에서는 먼저 칸의 순서를 정한 뒤 각 칸 안에서 오른쪽에서 왼쪽으로 읽습니다. 한 말풍선·상자·독립 문구가 한 항목입니다. 각 항목에 실제 읽기 순서 reading_order를 1부터 매기세요. 응답 배열 순서보다 reading_order가 우선합니다. jp는 원문, kana는 히라가나 독음, ko는 자연스러운 한국어 번역입니다. 읽을 수 없는 글자는 지어내지 말고 해당 항목만 생략하세요. 효과음은 넣지 마세요.",
+      output_config: { format: { type: "json_schema", schema: PREVIEW_SCHEMA } },
+      messages: [{
+        role: "user",
+        content: [{ type: "image", source: { type: "base64", media_type: image.mediaType, data: image.data } }],
+      }],
+    }),
+  });
+  if (!res.ok) throw new Error(`Anthropic preview ${res.status}: ${await res.text()}`);
+  const data = await res.json();
+  console.log(`[read-manga] preview ${Date.now() - started}ms out=${data.usage?.output_tokens ?? "?"}`);
+  const out = (data.content ?? []).find((b: { type: string }) => b.type === "text")?.text;
+  if (!out) throw new Error("빠른 대사 판독 결과가 없습니다.");
+  const raw = JSON.parse(out);
+  const { lines } = orderLines(Array.isArray(raw.lines) ? raw.lines : []);
+  return { gist: "", lines: lines.map((line) => ({...(line as object), note: ""})), vocab: [], grammar: [], kanji: [], sfx: [] };
 }
 
 // ─────────────────────────── 저장 ───────────────────────────
@@ -404,7 +476,7 @@ async function saveItems(
     .in("kanji", kanjiList);
 
   // 같은 표제어가 여러 레벨에 있으면 쉬운 쪽을 쓴다(클라이언트 cleanWords 와 같은 규칙)
-  const known = new Map<string, (typeof existing)[number]>();
+  const known = new Map<string, NonNullable<typeof existing>[number]>();
   for (const r of existing ?? []) {
     const prev = known.get(r.kanji);
     if (!prev || LEVEL_ORDER[r.level] < LEVEL_ORDER[prev.level]) known.set(r.kanji, r);
@@ -477,7 +549,7 @@ async function saveItems(
         saved_at: new Date(Date.now() + i).toISOString(),
       };
     })
-    .filter(Boolean);
+    .filter((row): row is NonNullable<typeof row> => row !== null);
   await db.from("manga_log").upsert(logRows, {
     onConflict: "user_id,word_id",
     ignoreDuplicates: true,
@@ -689,8 +761,8 @@ Deno.serve(async (req) => {
 
     if (body?.action === "regroup") return json(await regroup(req, apiKey));
 
-    if (body?.action !== "read") {
-      return json({ error: 'action 은 read | save | regroup 이어야 합니다' }, 400);
+    if (body?.action !== "read" && body?.action !== "preview") {
+      return json({ error: 'action 은 read | preview | save | regroup 이어야 합니다' }, 400);
     }
 
     const image = body.image as ImageIn | undefined;
@@ -699,13 +771,21 @@ Deno.serve(async (req) => {
       return json({ error: "지원하지 않는 이미지 형식입니다" }, 400);
     }
 
-    const raw = await read(apiKey, image, typeof body.title === "string" ? body.title.trim() : "");
+    if (body.action === "preview") return json({ read: await preview(apiKey, image) });
 
-    const lines = (Array.isArray(raw.lines) ? raw.lines : []).filter(validLine).slice(0, MAX_LINES);
+    const raw = await read(apiKey, image, typeof body.title === "string" ? body.title.trim() : "", body.quality === "fast" ? "fast" : "accurate");
+
+    const { lines, indexMap } = orderLines(Array.isArray(raw.lines) ? raw.lines : []);
+    const remap = <T extends { line_index?: number }>(item: T): T => {
+      item.line_index = indexMap.get(item.line_index ?? -1) ?? -1;
+      return item;
+    };
     const vocab = (Array.isArray(raw.vocab) ? raw.vocab : [])
+      .map(remap)
       .filter((v: VocabOut) => validVocab(v, lines.length))
       .slice(0, MAX_VOCAB);
     const grammar = (Array.isArray(raw.grammar) ? raw.grammar : [])
+      .map(remap)
       .filter((g: { point?: string; ko?: string; line_index?: number }) => {
         if (typeof g?.point !== "string" || !g.point.trim()) return false;
         if (!HANGUL.test(g.ko ?? "")) return false; // 설명은 한국어
@@ -714,6 +794,7 @@ Deno.serve(async (req) => {
       })
       .slice(0, MAX_GRAMMAR);
     const kanji = (Array.isArray(raw.kanji) ? raw.kanji : [])
+      .map(remap)
       .filter((k: { char?: string; line_index?: number }) => {
         if (typeof k?.char !== "string" || !JP.test(k.char)) return false;
         normIndex(k, lines.length);
@@ -721,7 +802,7 @@ Deno.serve(async (req) => {
       })
       .slice(0, MAX_KANJI);
     const sfx = (Array.isArray(raw.sfx) ? raw.sfx : [])
-      .filter((s: { jp?: string }) => typeof s?.jp === "string" && s.jp.trim())
+      .filter((s: { jp?: string }) => typeof s?.jp === "string" && /[ぁ-んァ-ヶ一-龯]/.test(s.jp))
       .slice(0, MAX_SFX);
 
     return json({

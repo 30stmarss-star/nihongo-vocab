@@ -56,6 +56,7 @@ import { Chat } from "./components/Chat";
 import { ConfusableCards } from "./components/ConfusableCards";
 import { ScanCapture } from "./components/ScanCapture";
 import { MangaRead } from "./components/MangaRead";
+import { MangaSaved } from "./components/MangaSaved";
 import { loadMangaBook, type MangaBook as MangaBookData } from "./lib/manga";
 import { flushMangaGroups, getMangaState, subscribeManga } from "./lib/mangaSession";
 import { Landing, type Mode } from "./components/Landing";
@@ -80,6 +81,7 @@ type View =
   | "speaklog"
   | "scan"
   | "mangabook"
+  | "mangasaved"
   | "kanji"
   | "tutor"
   | "quiz"
@@ -99,6 +101,7 @@ function difficultyRank(w: Word, progress: ProgressMap): 0 | 1 | 2 {
 export default function App() {
   const [phase, setPhase] = useState<Phase>("loading");
   const [userId, setUserId] = useState<string | null>(null);
+  const [mangaSavedReady, setMangaSavedReady] = useState(false);
   const loadedFor = useRef<string | null | undefined>(undefined);
 
   const [words, setWords] = useState<Word[]>([]);
@@ -129,6 +132,17 @@ export default function App() {
   const [card, setCard] = useState<{ word: Word; x: number; y: number } | null>(null);
   // 사전에 없는 단어의 카드를 만들어 저장하는 중
   const [savingCard, setSavingCard] = useState(false);
+
+  // The mobile reading flow can ship before the shared saved-card table is applied.
+  useEffect(() => {
+    if (!supabase || !userId) { setMangaSavedReady(false); return; }
+    let live = true;
+    const check = () => { void supabase!.from("manga_saved_items").select("id").limit(1)
+      .then(({ error }) => { if (live) setMangaSavedReady(!error); }); };
+    check();
+    document.addEventListener("visibilitychange", check);
+    return () => { live = false; document.removeEventListener("visibilitychange", check); };
+  }, [userId]);
 
   // ── 인증 / 초기 로드 ──
   useEffect(() => {
@@ -731,7 +745,9 @@ export default function App() {
           </button>
         )}
         <h1 className="text-lg font-extrabold text-ink">
-          {view === "mangabook"
+          {view === "mangasaved"
+            ? "만화 저장고 📌"
+            : view === "mangabook"
             ? "만화 단어장 🗂"
             : view === "wordbook"
             ? "단어장 📚"
@@ -782,7 +798,7 @@ export default function App() {
           }}
         />
       ) : view === "home" && mode === "manga" ? (
-        <MangaRead onSaved={(rows) => mergeMyWords(rows.map(rowToWord))} />
+        <MangaRead userId={mangaSavedReady ? userId : null} onSaved={(rows) => mergeMyWords(rows.map(rowToWord))} />
       ) : view === "home" ? (
         <Home
           plan={plan}
@@ -856,6 +872,8 @@ export default function App() {
             setCard((c) => (c && c.word.id === word.id ? null : { word, x, y }))
           }
         />
+      ) : view === "mangasaved" ? (
+        <MangaSaved userId={userId} />
       ) : view === "mangabook" ? (
         <MangaBook
           sections={mangaSections}
@@ -904,6 +922,7 @@ export default function App() {
                 onClick={() => go("home")}
               />
               <NavBtn label="묶음" icon="🗂" active={view === "mangabook"} onClick={() => go("mangabook")} />
+              {mangaSavedReady && <NavBtn label="저장고" icon="📌" active={view === "mangasaved"} onClick={() => go("mangasaved")} />}
               <NavBtn label="단어장" icon="📚" active={view === "wordbook"} onClick={() => go("wordbook")} />
               <NavBtn label="더보기" icon="⋯" active={menuOpen} onClick={() => setMenuOpen((o) => !o)} />
             </>
