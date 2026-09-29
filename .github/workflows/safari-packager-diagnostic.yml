@@ -39,6 +39,9 @@ jobs:
           xcodebuild -list -json -project "$project" > "$RUNNER_TEMP/schemes.json"
           scheme="$(python3 -c 'import json,sys; schemes=json.load(open(sys.argv[1]))["project"]["schemes"]; print(next((s for s in schemes if "iOS" in s), schemes[0]))' "$RUNNER_TEMP/schemes.json")"
           printf 'Project: %s\nScheme: %s\n' "$project" "$scheme"
+          grep -n 'PRODUCT_BUNDLE_IDENTIFIER' "$project/project.pbxproj" | while IFS= read -r line; do
+            echo "::notice::Generated bundle ID: $line"
+          done
           xcodebuild -project "$project" -scheme "$scheme" \
             -configuration Debug -sdk iphonesimulator \
             -destination 'generic/platform=iOS Simulator' \
