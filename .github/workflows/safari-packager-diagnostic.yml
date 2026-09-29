@@ -26,7 +26,7 @@ jobs:
           xcrun safari-web-extension-packager \
             "$GITHUB_WORKSPACE/diagnostics/safari-packager-extension" \
             --project-location "$RUNNER_TEMP/safari-conversion" \
-            --app-name "Packager Diagnostic" \
+            --app-name "packagerdiagnostic" \
             --bundle-identifier "com.thirtystmarss.packagerdiagnostic" \
             --swift --ios-only --copy-resources --no-open --no-prompt \
             2>&1 | tee "$RUNNER_TEMP/packager.log"
