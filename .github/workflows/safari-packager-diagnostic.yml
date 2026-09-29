@@ -47,6 +47,12 @@ jobs:
             -destination 'generic/platform=iOS Simulator' \
             CODE_SIGNING_ALLOWED=NO build \
             2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+          xcodebuild -project "$project" -scheme "$scheme" \
+            -configuration Release -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -archivePath "$RUNNER_TEMP/packagerdiag.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO archive \
+            2>&1 | tee "$RUNNER_TEMP/archive.log"
 
       - name: Publish compiler diagnostics on the public run page
         if: always()
@@ -61,6 +67,13 @@ jobs:
             if test -f "$RUNNER_TEMP/xcodebuild.log"; then
               grep -E 'error:|warning:|BUILD FAILED|The following build commands failed:' "$RUNNER_TEMP/xcodebuild.log" | tail -n 40 || true
               tail -n 25 "$RUNNER_TEMP/xcodebuild.log"
+            fi
+            echo '```'
+            echo '## Unsigned iOS device archive'
+            echo '```text'
+            if test -f "$RUNNER_TEMP/archive.log"; then
+              grep -E 'error:|warning:|ARCHIVE FAILED|ARCHIVE SUCCEEDED' "$RUNNER_TEMP/archive.log" | tail -n 40 || true
+              tail -n 25 "$RUNNER_TEMP/archive.log"
             fi
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
@@ -78,5 +91,6 @@ jobs:
           path: |
             ${{ runner.temp }}/packager.log
             ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/archive.log
             ${{ runner.temp }}/schemes.json
           if-no-files-found: warn
