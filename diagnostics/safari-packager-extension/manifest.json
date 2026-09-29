@@ -1,6 +1,6 @@
 {
     "manifest_version":  3,
-    "name":  "Manga Study Packager Test",
+    "name":  "packagerdiag",
     "version":  "1.0",
     "description":  "Static popup control for Safari Web Extension packaging.",
     "icons":  {
@@ -11,7 +11,7 @@
                   "1024":  "icons/icon-1024.png"
               },
     "action":  {
-                   "default_title":  "Manga Study Packager Test",
+                   "default_title":  "packagerdiag",
                    "default_popup":  "popup.html"
                }
 }
