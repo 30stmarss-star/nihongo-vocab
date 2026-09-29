@@ -1,0 +1,57 @@
+name: Safari Packager diagnostic
+
+on:
+  push:
+    branches:
+      - diagnostic/safari-packager-20260929
+
+permissions:
+  contents: read
+
+jobs:
+  convert-and-build:
+    runs-on: macos-26
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Show Apple tool versions
+        run: |
+          xcodebuild -version
+          xcrun --find safari-web-extension-packager
+
+      - name: Convert the same static control that failed in the web Packager
+        run: |
+          set -euo pipefail
+          xcrun safari-web-extension-packager \
+            "$GITHUB_WORKSPACE/diagnostics/safari-packager-extension" \
+            --project-location "$RUNNER_TEMP/safari-conversion" \
+            --app-name "Packager Diagnostic" \
+            --bundle-identifier "com.thirtystmarss.packagerdiagnostic" \
+            --swift --ios-only --copy-resources --no-open --no-prompt \
+            2>&1 | tee "$RUNNER_TEMP/packager.log"
+
+      - name: Compile generated iOS app without signing
+        run: |
+          set -euo pipefail
+          project="$(find "$RUNNER_TEMP/safari-conversion" -type d -name '*.xcodeproj' -print -quit)"
+          test -n "$project"
+          xcodebuild -list -json -project "$project" > "$RUNNER_TEMP/schemes.json"
+          scheme="$(python3 -c 'import json,sys; schemes=json.load(open(sys.argv[1]))["project"]["schemes"]; print(next((s for s in schemes if "iOS" in s), schemes[0]))' "$RUNNER_TEMP/schemes.json")"
+          printf 'Project: %s\nScheme: %s\n' "$project" "$scheme"
+          xcodebuild -project "$project" -scheme "$scheme" \
+            -configuration Debug -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO build \
+            2>&1 | tee "$RUNNER_TEMP/xcodebuild.log"
+
+      - name: Save diagnostic logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: safari-packager-diagnostic-logs
+          path: |
+            ${{ runner.temp }}/packager.log
+            ${{ runner.temp }}/xcodebuild.log
+            ${{ runner.temp }}/schemes.json
+          if-no-files-found: warn
